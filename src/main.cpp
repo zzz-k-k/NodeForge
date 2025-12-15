@@ -5,6 +5,10 @@
 #include<cmath>
 #include<stb_image.h>
 
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_opengl3.h"
+
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -90,9 +94,42 @@ int main()
     glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0); // 手动设置
     ourShader.setInt("texture2", 1); // 或者使用着色器类设置
 
+    // ===== ImGui init =====
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); 
+    (void)io;
+    io.FontGlobalScale = 1.5f; 
+
+    ImGui::StyleColorsDark();
+
+    // 绑定到 GLFW + OpenGL3
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
+    static float mixFactor = 0.5f;
+    static bool wireframe = false;
+
+
+
     while(!glfwWindowShouldClose(window))
     {
         processInput(window);
+
+        // ===== ImGui per-frame begin =====
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // ===== 这里写你的调试面板 =====
+        ImGui::Begin("Debug");
+        ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+        ImGui::SliderFloat("Mix", &mixFactor, 0.0f, 1.0f);
+        ImGui::Checkbox("Wireframe", &wireframe);
+        ImGui::End();
+
+        // 用 UI 控制渲染状态/参数（示例）
+        glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
         
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -106,10 +143,20 @@ int main()
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+        // ===== ImGui draw =====
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         
         glfwSwapBuffers(window);//显示窗口
         glfwPollEvents(); 
     }
+
+    //释放imgui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
     glfwTerminate();
 
 

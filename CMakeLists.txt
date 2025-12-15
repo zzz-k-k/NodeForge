@@ -11,15 +11,14 @@ add_executable(LearnOpenGL
 
 target_include_directories(LearnOpenGL PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
-    "${CMAKE_SOURCE_DIR}/Dev/glfw-3.4/include"
     "${CMAKE_SOURCE_DIR}/src"
 )
 
-target_link_directories(LearnOpenGL PRIVATE
-    "${CMAKE_SOURCE_DIR}/Dev/glfw-3.4/build/src/Debug"
-)
+add_subdirectory(Dev/glfw-3.4)
+add_subdirectory(Dev/imgui-1.92.5)
 
 target_link_libraries(LearnOpenGL PRIVATE
-    glfw3
+    glfw
     opengl32
+    imgui
 )

@@ -178,6 +178,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{08421DC7-52F3-3BB9-BDD4-33EE937A74EB}</Project>
       <Name>LearnOpenGL</Name>
     </ProjectReference>
+    <ProjectReference Include="D:\Renderer\build\Dev\glfw-3.4\src\glfw.vcxproj">
+      <Project>{0B064B6C-44DC-3BD8-AC7E-5A73E189D4E6}</Project>
+      <Name>glfw</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\Renderer\build\Dev\imgui-1.92.5\imgui.vcxproj">
+      <Project>{740C26A5-5827-3EC2-8A3A-706C95242AD8}</Project>
+      <Name>imgui</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

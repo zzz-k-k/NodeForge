@@ -1,0 +1,6 @@
+D:\Renderer\Dev\imgui-1.92.5\imgui.cpp;D:\Renderer\build\Dev\imgui-1.92.5\imgui.dir\Debug\imgui.obj
+D:\Renderer\Dev\imgui-1.92.5\imgui_draw.cpp;D:\Renderer\build\Dev\imgui-1.92.5\imgui.dir\Debug\imgui_draw.obj
+D:\Renderer\Dev\imgui-1.92.5\imgui_tables.cpp;D:\Renderer\build\Dev\imgui-1.92.5\imgui.dir\Debug\imgui_tables.obj
+D:\Renderer\Dev\imgui-1.92.5\imgui_widgets.cpp;D:\Renderer\build\Dev\imgui-1.92.5\imgui.dir\Debug\imgui_widgets.obj
+D:\Renderer\Dev\imgui-1.92.5\backends\imgui_impl_glfw.cpp;D:\Renderer\build\Dev\imgui-1.92.5\imgui.dir\Debug\imgui_impl_glfw.obj
+D:\Renderer\Dev\imgui-1.92.5\backends\imgui_impl_opengl3.cpp;D:\Renderer\build\Dev\imgui-1.92.5\imgui.dir\Debug\imgui_impl_opengl3.obj
