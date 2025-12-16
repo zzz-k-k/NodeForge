@@ -86,7 +86,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -110,10 +110,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;IMGUI_IMPL_OPENGL_LOADER_GLAD;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -140,7 +140,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -165,10 +165,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;IMGUI_IMPL_OPENGL_LOADER_GLAD;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -195,7 +195,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -220,10 +220,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;IMGUI_IMPL_OPENGL_LOADER_GLAD;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -250,7 +250,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -274,10 +274,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;IMGUI_IMPL_OPENGL_LOADER_GLAD;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Renderer\include;D:\Renderer\src;D:\Renderer\Dev\glm;D:\Renderer\Dev\glfw-3.4\include;D:\Renderer\Dev\imgui-1.92.5;D:\Renderer\Dev\imgui-1.92.5\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>

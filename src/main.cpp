@@ -9,6 +9,11 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -40,10 +45,10 @@ int main()
 
     float vertices[] = 
     {
-        0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   2.0f, 2.0f,   // 右上
-        0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   2.0f, 0.0f,   // 右下
+        0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // 右上
+        0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,   // 右下
         -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // 左下
-        -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 2.0f    // 左上
+        -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f    // 左上
     };
 
     unsigned int indices[]=
@@ -88,60 +93,84 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     Shader ourShader("../../src/shader/shader.vs", "../../src/shader/shader.fs");
-    ourShader.use();
-
-
-    glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0); // 手动设置
-    ourShader.setInt("texture2", 1); // 或者使用着色器类设置
-
+    
+    
     // ===== ImGui init =====
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); 
     (void)io;
     io.FontGlobalScale = 1.5f; 
-
+    
     ImGui::StyleColorsDark();
-
+    
     // 绑定到 GLFW + OpenGL3
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
-
-    static float mixFactor = 0.5f;
+    
     static bool wireframe = false;
+    
+    float x=1.0f;
+    float rotation=0.0f;
+    glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
+    glm::vec3 pos =glm::vec3(0.0f,0.0f,0.0f);
 
 
-
+    
+    
     while(!glfwWindowShouldClose(window))
     {
         processInput(window);
-
+        
+        
+        ourShader.use();
+        ourShader.setFloat("u_Tiling", x);
+        
+        ourShader.setInt("texture1",0);
+        ourShader.setInt("texture2", 1); // 或者使用着色器类设置
+        
         // ===== ImGui per-frame begin =====
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
+        
         // ===== 这里写你的调试面板 =====
         ImGui::Begin("Debug");
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-        ImGui::SliderFloat("Mix", &mixFactor, 0.0f, 1.0f);
         ImGui::Checkbox("Wireframe", &wireframe);
+        ImGui::SliderFloat("x",&x,0.0f,5.0f);
+        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::SliderFloat("rotation", &rotation, 0.0f,360.0f);
+            ImGui::DragFloat3("scale", glm::value_ptr(scale), 0.01f);
+            ImGui::DragFloat3("position", glm::value_ptr(pos), 0.01f);
+        }
         ImGui::End();
-
+        
         // 用 UI 控制渲染状态/参数（示例）
         glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
         
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-
-
+        
+        
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, texture2);
-
+        
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        //变换
+        glm::mat4 trans;
+        trans = glm::rotate(trans, glm::radians(rotation), glm::vec3(0.0, 0.0, 1.0));
+        trans = glm::scale(trans, scale);
+        //位移
+        trans = glm::translate(trans, pos);
+        //旋转
+        unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
         // ===== ImGui draw =====
         ImGui::Render();
