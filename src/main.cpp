@@ -13,6 +13,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <camera.h>
+
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -22,11 +24,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
-glm::vec3 cameraPos=glm::vec3(0.0f,0.0f,3.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 float deltaTime = 0.0f;
 float lastFrame = 0.0f; 
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
 float vertices[] = 
 {
@@ -106,9 +106,7 @@ glm::vec3 pos =glm::vec3(0.0f,0.0f,0.0f);
 //鼠标初始位置
 float lastX = 400, lastY = 300;
 bool firstMouse=true;
-float pitch=0.0f;
-float yaw=-90.0f;
-float fov=45.0f;
+
 
 float cameraControl=false;
 
@@ -186,21 +184,6 @@ int main()
     //启用深度缓冲
     glEnable(GL_DEPTH_TEST);
     
-    //隐藏并捕捉鼠标
-    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    //摄像机
-    
-
-    glm::vec3 cameraTarget=glm::vec3(0.0f,0.0f,0.0f);
-    glm::vec3 cameraDirection=glm::normalize(cameraPos-cameraTarget);
-
-    glm::vec3 up=glm::vec3(0.0f,1.0f,0.0f);
-    glm::vec3 cameraRight=glm::normalize(glm::cross(up,cameraDirection));
-    //glm::vec3 cameraUp=glm::cross(cameraDirection,cameraRight);
-    cameraDirection.x = cos(glm::radians(pitch)) * cos(glm::radians(yaw)); // 译注：direction代表摄像机的前轴(Front)，这个前轴是和本文第一幅图片的第二个摄像机的方向向量是相反的
-    cameraDirection.y = sin(glm::radians(pitch));
-    cameraDirection.z = cos(glm::radians(pitch)) * sin(glm::radians(yaw));
     
 
     glm::mat4 view;
@@ -277,24 +260,16 @@ int main()
 
         float camX = sin(glfwGetTime()) * radius;
         float camZ = cos(glfwGetTime()) * radius;
-        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
 
-        //投影矩阵
-        glm::mat4 projection;
-        projection = glm::perspective(glm::radians(fov), 800.0f / 600.0f, 0.1f, 100.0f);
+
+
+        ourShader.setMat4("transform",trans);
         
-        // //观察矩阵
-        // glm::mat4 view;
-        // // 注意，我们将矩阵向我们要进行移动场景的反方向移动。
-        // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-        
-        //矩阵传入着色器
-        unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-        unsigned int viewLoc = glGetUniformLocation(ourShader.ID, "view");
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        unsigned int projectionLoc = glGetUniformLocation(ourShader.ID, "projection");
-        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        glm::mat4 view = camera.GetViewMatrix(); 
+        ourShader.setMat4("view",view);
+
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)800.0f / (float)600.0f, 0.1f, 100.0f);
+        ourShader.setMat4("projection", projection);
         
         // 用 UI 控制渲染状态/参数（示例）
         glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
@@ -365,13 +340,13 @@ void processInput(GLFWwindow *window)
 
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        cameraPos += cameraSpeed * cameraFront;
+        camera.ProcessKeyboard(FORWARD,deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        cameraPos -= cameraSpeed * cameraFront;
+        camera.ProcessKeyboard(BACKWARD,deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        camera.ProcessKeyboard(LEFT,deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        camera.ProcessKeyboard(RIGHT,deltaTime);
 }
 
 //鼠标输入
@@ -394,23 +369,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastX = xpos;
     lastY = ypos;
 
-    float sensitivity = 0.05;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-
-    yaw   += xoffset;
-    pitch += yoffset;
-
-    if(pitch > 89.0f)
-        pitch = 89.0f;
-    if(pitch < -89.0f)
-        pitch = -89.0f;
-
-    glm::vec3 front;
-    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    front.y = sin(glm::radians(pitch));
-    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    cameraFront = glm::normalize(front);
+    camera.ProcessMouseMovement(xoffset,yoffset);
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
@@ -420,12 +379,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-  if(fov >= 1.0f && fov <= 45.0f)
-    fov -= yoffset;
-  if(fov <= 1.0f)
-    fov = 1.0f;
-  if(fov >= 45.0f)
-    fov = 45.0f;
+  camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
 //加载纹理对象
