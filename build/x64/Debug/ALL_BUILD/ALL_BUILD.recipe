@@ -8,6 +8,9 @@
       <FullPath>D:\Renderer\build\Debug\LearnOpenGL.exe</FullPath>
     </ProjectOutput>
     <ProjectOutput>
+      <FullPath>D:\Renderer\build\Dev\assimp-6.0.2\bin\Debug\unit.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
       <FullPath>D:\Renderer\build\x64\Debug\ALL_BUILD</FullPath>
     </ProjectOutput>
   </ProjectOutputs>

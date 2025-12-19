@@ -17,9 +17,11 @@ target_include_directories(LearnOpenGL PRIVATE
 
 add_subdirectory(Dev/glfw-3.4)
 add_subdirectory(Dev/imgui-1.92.5)
+add_subdirectory(Dev/assimp-6.0.2)
 
 target_link_libraries(LearnOpenGL PRIVATE
     glfw
     opengl32
     imgui
+    assimp
 )

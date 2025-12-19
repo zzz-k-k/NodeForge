@@ -178,6 +178,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{08421DC7-52F3-3BB9-BDD4-33EE937A74EB}</Project>
       <Name>LearnOpenGL</Name>
     </ProjectReference>
+    <ProjectReference Include="D:\Renderer\build\Dev\assimp-6.0.2\code\assimp.vcxproj">
+      <Project>{02B88095-5034-344E-927D-378F282DC246}</Project>
+      <Name>assimp</Name>
+    </ProjectReference>
     <ProjectReference Include="D:\Renderer\build\Dev\glfw-3.4\src\glfw.vcxproj">
       <Project>{0B064B6C-44DC-3BD8-AC7E-5A73E189D4E6}</Project>
       <Name>glfw</Name>
@@ -185,6 +189,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ProjectReference Include="D:\Renderer\build\Dev\imgui-1.92.5\imgui.vcxproj">
       <Project>{740C26A5-5827-3EC2-8A3A-706C95242AD8}</Project>
       <Name>imgui</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\Renderer\build\Dev\assimp-6.0.2\test\unit.vcxproj">
+      <Project>{B8B6CA20-F2BF-35FE-8D43-DE622B511160}</Project>
+      <Name>unit</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\Renderer\build\Dev\assimp-6.0.2\contrib\zlib\zlibstatic.vcxproj">
+      <Project>{3C3A30E5-45C0-3E27-9911-7D2A29F34585}</Project>
+      <Name>zlibstatic</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
