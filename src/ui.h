@@ -12,8 +12,10 @@
 
 #include <GLFW/glfw3.h>
 
+#include<algorithm>
+#include<string>
+
 bool showBuildWindow=false;
-bool showTransformWindow=false;
 
 
 class UI
@@ -50,7 +52,6 @@ class UI
             if(ImGui::BeginMenu("Window"))
             {
                 ImGui::MenuItem("build",nullptr,&showBuildWindow);
-                ImGui::MenuItem("transform",nullptr,&showTransformWindow);
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -68,23 +69,51 @@ class UI
             }
             ImGui::End();
         }
-        if(showTransformWindow)
+
+        //右侧常驻菜单
+        ImGuiIO& io=ImGui::GetIO();
+        ImVec2 size(240,300);
+        ImVec2 pos(io.DisplaySize.x-size.x-10,220);
+        ImGui::SetNextWindowPos(pos,ImGuiCond_Always);
+        ImGui::SetNextWindowSize(size,ImGuiCond_Always);
+
+        ImGui::Begin("scene",nullptr,ImGuiWindowFlags_NoResize);
+
+        int deleteId=-1;
+        
+        for(auto& obj:build.objects)
         {
-            ImGui::SetNextWindowPos(ImVec2(10,40),ImGuiCond_Always);
-            ImGui::SetNextWindowSize(ImVec2(120,140),ImGuiCond_Always);
-            ImGui::Begin("transform",&showTransformWindow,
-                            ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove);
+            std::string label="cube##"+std::to_string(obj.id);
+            bool isSelected=(obj.id==build.selectedId);
 
-            if(ImGui::Button("move",ImVec2(-1,0))) gizmoOp=ImGuizmo::TRANSLATE;
-            if(ImGui::Button("rotate",ImVec2(-1,0))) gizmoOp=ImGuizmo::ROTATE;
-            if(ImGui::Button("scale",ImVec2(-1,0))) gizmoOp=ImGuizmo::SCALE;
-
-            ImGui::End();
+            if(ImGui::Selectable(label.c_str(),isSelected))
+            {
+                build.selectedId=obj.id;
+                for(auto& o:build.objects)o.selected=(o.id=obj.id);
+            }
+            if(ImGui::BeginPopupContextItem())
+            {
+                if(ImGui::MenuItem("delete"))
+                {
+                    deleteId=obj.id;
+                }
+                ImGui::EndPopup();
+            }
         }
+        if(deleteId!=-1)
+        {
+            build.objects.erase(
+                std::remove_if(build.objects.begin(),build.objects.end(),
+                                [deleteId](const SceneObject& o){return o.id==deleteId;}),
+                build.objects.end()
+            );
+            if(build.selectedId==deleteId)
+                build.selectedId=-1;
+        }
+        
         if(build.selectedId!=-1)
         {
-            ImGuiIO& io=ImGui::GetIO();
-            ImVec2 size(361,200);
+            ImVec2 size(360,200);
             ImVec2 pos(io.DisplaySize.x-size.x-10,40);
             ImGui::SetNextWindowPos(pos,ImGuiCond_Always);
             ImGui::SetNextWindowSize(size,ImGuiCond_Always);
@@ -120,6 +149,8 @@ class UI
 
             ImGui::End();
         }
+
+        ImGui::End();
     }
     void EndUI()
     {
