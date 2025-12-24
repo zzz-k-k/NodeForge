@@ -20,7 +20,7 @@ uniform mat4 view;
 void main()
 {
     gl_Position = projection*view*transform*vec4(aPos, 1.0);
-    TexCoord=aTexCoord*u_Tiling;
+    TexCoord=aTexCoord;
     FragPos=vec3(transform*vec4(aPos,1.0));
     Normal = mat3(transpose(inverse(transform))) * aNormal;
 };

@@ -6,11 +6,19 @@
 
 #include<glad/glad.h>
 
+#include<memory>
+#include"model.h"
+
+enum class ObjType{Cube,Light,Model};
 struct SceneObject
 {
     glm::mat4 model;
     int id=0;
     bool selected=false;
+    ObjType type=ObjType::Cube;
+
+    std::shared_ptr<Model> modelAsset;
+
 };
 
 struct CubeMesh
@@ -97,6 +105,11 @@ public:
     int nextId=1;
     int selectedId=-1;
     CubeMesh cube;
+
+    std::shared_ptr<Model> loadModel(const std::string& path)
+    {
+        return std::make_shared<Model>(path.c_str());
+    }
 };
 
 #endif

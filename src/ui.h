@@ -16,7 +16,7 @@
 #include<string>
 
 bool showBuildWindow=false;
-
+bool showFileWindwo=false;
 
 class UI
 {
@@ -54,6 +54,11 @@ class UI
                 ImGui::MenuItem("build",nullptr,&showBuildWindow);
                 ImGui::EndMenu();
             }
+            if(ImGui::BeginMenu("file"))
+            {
+                ImGui::MenuItem("import",nullptr,&showFileWindwo);
+                ImGui::EndMenu();
+            }
             ImGui::EndMainMenuBar();
         }
         if(showBuildWindow)
@@ -65,15 +70,42 @@ class UI
                 obj.id=build.nextId++;
                 obj.model=glm::mat4(1.0f);
                 obj.selected=false;
+                obj.type=ObjType::Cube;
+                build.objects.push_back(obj);
+            }
+            if(ImGui::Button("light"))
+            {
+                SceneObject obj;
+                obj.id=build.nextId++;
+                obj.model=glm::mat4(1.0f);
+                obj.selected=false;
+                obj.type=ObjType::Light;
                 build.objects.push_back(obj);
             }
             ImGui::End();
+            
+        }
+        if(showFileWindwo)
+        {
+            if(ImGui::MenuItem("import"))
+            {
+                const std::string path="backpack/backpack.obj";
+
+                SceneObject obj;
+                obj.id=build.nextId++;
+                obj.model=glm::mat4(1.0f);
+                obj.selected=false;
+                obj.type=ObjType::Model;
+                obj.modelAsset=std::make_shared<Model>(path.c_str());
+
+                build.objects.push_back(obj);
+            }
         }
 
         //右侧常驻菜单
         ImGuiIO& io=ImGui::GetIO();
-        ImVec2 size(240,300);
-        ImVec2 pos(io.DisplaySize.x-size.x-10,220);
+        ImVec2 size(300,260);
+        ImVec2 pos(io.DisplaySize.x-size.x-10,40);
         ImGui::SetNextWindowPos(pos,ImGuiCond_Always);
         ImGui::SetNextWindowSize(size,ImGuiCond_Always);
 
@@ -83,13 +115,14 @@ class UI
         
         for(auto& obj:build.objects)
         {
-            std::string label="cube##"+std::to_string(obj.id);
+            std::string name = (obj.type == ObjType::Light) ? "Light" : "Cube";
+            std::string label = name + "##" + std::to_string(obj.id);
             bool isSelected=(obj.id==build.selectedId);
 
             if(ImGui::Selectable(label.c_str(),isSelected))
             {
                 build.selectedId=obj.id;
-                for(auto& o:build.objects)o.selected=(o.id=obj.id);
+                for(auto& o:build.objects)o.selected=(o.id==obj.id);
             }
             if(ImGui::BeginPopupContextItem())
             {
@@ -113,8 +146,8 @@ class UI
         
         if(build.selectedId!=-1)
         {
-            ImVec2 size(360,200);
-            ImVec2 pos(io.DisplaySize.x-size.x-10,40);
+            ImVec2 size(300,200);
+            ImVec2 pos(io.DisplaySize.x-size.x-10,320);
             ImGui::SetNextWindowPos(pos,ImGuiCond_Always);
             ImGui::SetNextWindowSize(size,ImGuiCond_Always);
 

@@ -38,40 +38,8 @@ Raycaster raycaster;
 ImGuizmo::OPERATION gizmoOp=ImGuizmo::TRANSLATE;
 ImGuizmo::MODE gizmoMode=ImGuizmo::WORLD;
 
-unsigned int indices[]=
-{
-    0,1,3,
-    1,2,3
-};
-
-//世界坐标
-glm::vec3 cubePositions[] = 
-{
-    glm::vec3( 0.0f,  0.0f,  0.0f), 
-    glm::vec3( 2.0f,  5.0f, -15.0f), 
-    glm::vec3(-1.5f, -2.2f, -2.5f),  
-    glm::vec3(-3.8f, -2.0f, -12.3f),  
-    glm::vec3( 2.4f, -0.4f, -3.5f),  
-    glm::vec3(-1.7f,  3.0f, -7.5f),  
-    glm::vec3( 1.3f, -2.0f, -2.5f),  
-    glm::vec3( 1.5f,  2.0f, -2.5f), 
-    glm::vec3( 1.5f,  0.2f, -1.5f), 
-    glm::vec3(-1.3f,  1.0f, -1.5f)  
-};
-
-glm::vec3 pointLightPositions[] = {
-    glm::vec3( 0.7f,  0.2f,  2.0f),
-    glm::vec3( 2.3f, -3.3f, -4.0f),
-    glm::vec3(-4.0f,  2.0f, -12.0f),
-    glm::vec3( 0.0f,  0.0f, -3.0f)
-};
-
-//------------TRANSFORM--------------
 static bool wireframe = false;
-float x=1.0f;
-float zrotation=0.0f;
-float xrotation=0.0f;
-float yrotation=0.0f;
+
 glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
 glm::vec3 pos =glm::vec3(0.0f,0.0f,0.0f);
 
@@ -83,8 +51,6 @@ float cameraControl=false;
 
 //灯的位置
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-
-bool usingFlashlight=false;
 
 
 
@@ -119,6 +85,7 @@ int main()
     //初始化默认立方体
     build.cube.Init();
 
+    glm::mat4 trans;
 
     //设置灯的数据
     unsigned int lightVAO;
@@ -129,7 +96,6 @@ int main()
     // 设置灯立方体的顶点属性（对我们的灯来说仅仅只有位置数据）
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    
     
     glViewport(0, 0, 800, 600);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -186,33 +152,14 @@ int main()
 
         processInput(window);
         
-        ourShader.use();
-        ourShader.setFloat("u_Tiling", x);
-        
-        
-        
-        
-        //变换
-        glm::mat4 trans;
-        trans = glm::rotate(trans, glm::radians(zrotation), glm::vec3(0.0, 0.0, 1.0));
-        trans =glm::rotate(trans,glm::radians(xrotation),glm::vec3(1.0,0.0,0.0));
-        trans =glm::rotate(trans,glm::radians(yrotation),glm::vec3(0.0,1.0,0.0));
-        trans = glm::scale(trans, scale);
-        //位移
-        trans = glm::translate(trans, pos);
-        //旋转
-        
-        float camX = sin(glfwGetTime()) * radius;
-        float camZ = cos(glfwGetTime()) * radius;
-        
-        
-        
-        ourShader.setMat4("transform",trans);
+        ourShader.use();        
         
         glm::mat4 view = camera.GetViewMatrix(); 
         ourShader.setMat4("view",view);
         
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)800.0f / (float)600.0f, 0.1f, 100.0f);
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)width / (float)height, 0.1f, 100.0f);
         ourShader.setMat4("projection", projection);
         
         ourShader.setVec3("viewPos",camera.Position);
@@ -225,38 +172,29 @@ int main()
         ourShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
         ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
         ourShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-        // point light 1
-        ourShader.setVec3("pointLights[0].position", pointLightPositions[0]);
-        ourShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[0].constant", 1.0f);
-        ourShader.setFloat("pointLights[0].linear", 0.09f);
-        ourShader.setFloat("pointLights[0].quadratic", 0.032f);
-        // point light 2
-        ourShader.setVec3("pointLights[1].position", pointLightPositions[1]);
-        ourShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[1].constant", 1.0f);
-        ourShader.setFloat("pointLights[1].linear", 0.09f);
-        ourShader.setFloat("pointLights[1].quadratic", 0.032f);
-        // point light 3
-        ourShader.setVec3("pointLights[2].position", pointLightPositions[2]);
-        ourShader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[2].constant", 1.0f);
-        ourShader.setFloat("pointLights[2].linear", 0.09f);
-        ourShader.setFloat("pointLights[2].quadratic", 0.032f);
-        // point light 4
-        ourShader.setVec3("pointLights[3].position", pointLightPositions[3]);
-        ourShader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[3].constant", 1.0f);
-        ourShader.setFloat("pointLights[3].linear", 0.09f);
-        ourShader.setFloat("pointLights[3].quadratic", 0.032f);
+        
+        //pointlight
+        int lightindex=0;
+        const int maxLights=8;
+        for(auto& obj:build.objects)
+        {
+            if(obj.type==ObjType::Light&&lightindex<maxLights)
+            {
+                glm::vec3 pos=glm::vec3(obj.model[3]);
+                std::string base = "pointLights[" + std::to_string(lightindex) + "].";
+                ourShader.setVec3(base + "position", pos);
+                ourShader.setVec3(base + "ambient", 0.05f, 0.05f, 0.05f);
+                ourShader.setVec3(base + "diffuse", 0.8f, 0.8f, 0.8f);
+                ourShader.setVec3(base + "specular", 1.0f, 1.0f, 1.0f);
+                ourShader.setFloat(base + "constant", 1.0f);
+                ourShader.setFloat(base + "linear", 0.09f);
+                ourShader.setFloat(base + "quadratic", 0.032f);
+    
+                lightindex++;
+            }
+        }
+        ourShader.setInt("numPointLights", lightindex);
+
         // spotLight
         ourShader.setVec3("spotLight.position", camera.Position);
         ourShader.setVec3("spotLight.direction", camera.Front);
@@ -298,12 +236,29 @@ int main()
         ourShader.setInt("material.texture_diffuse1", 0);
         ourShader.setInt("material.texture_specular1", 1);
 
-        //ourModel.Draw(ourShader);
-
         for (auto& obj : build.objects)
         {
-            ourShader.setMat4("transform", obj.model);
-            build.cube.Draw();
+            if(obj.type==ObjType::Light)
+            {
+                lampShader.use();
+                lampShader.setMat4("view", view);
+                lampShader.setMat4("projection", projection);
+
+                lampShader.setMat4("model",obj.model);
+                build.cube.Draw();
+            }
+            else if(obj.type==ObjType::Model&&obj.modelAsset)
+            {
+                ourShader.use();
+                ourShader.setMat4("transform",obj.model);
+                obj.modelAsset->Draw(ourShader);
+            }
+            else
+            {
+                ourShader.use();
+                ourShader.setMat4("transform", obj.model);
+                build.cube.Draw();
+            }
             //选中时显示线框
             if (obj.selected)
             {
@@ -326,20 +281,6 @@ int main()
             }
         }
 
-
-        //绘制光源
-        lampShader.use();
-        lampShader.setMat4("view", view);
-        lampShader.setMat4("projection", projection);
-        glBindVertexArray(lightVAO);
-        for (unsigned int i = 0; i < 4; i++)
-         {
-             model = glm::mat4(1.0f);
-             model = glm::translate(model, pointLightPositions[i]);
-             model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
-             lampShader.setMat4("model", model);
-             glDrawArrays(GL_TRIANGLES, 0, 36);
-         }
 
         // ===== ImGui draw =====
         ui.BeginUI();
