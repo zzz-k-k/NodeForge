@@ -62,6 +62,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_STENCIL_BITS, 8);
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
 
@@ -112,8 +113,11 @@ int main()
     grid.init(gridShader, 50.0f);
 
     //启用深度缓冲
+    //启用深度缓冲
     glEnable(GL_DEPTH_TEST);
-    
+    glEnable(GL_STENCIL_TEST);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    glStencilMask(0x00);
     
 
     glm::mat4 view;
@@ -227,7 +231,8 @@ int main()
         
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         //清除深度缓冲和清屏
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glStencilMask(0xFF);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
@@ -240,8 +245,19 @@ int main()
         ourShader.setInt("material.texture_diffuse1", 0);
         ourShader.setInt("material.texture_specular1", 1);
 
+        // 第一遍：绘制所有物体，选中的写入模板
         for (auto& obj : build.objects)
         {
+            // 默认不写入模板
+            glStencilMask(0x00);
+
+            if(obj.selected)
+            {
+                // 如果被选中，允许写入模板，且值设为 1
+                glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                glStencilMask(0xFF);
+            }
+
             if(obj.type==ObjType::Light)
             {
                 lampShader.use();
@@ -263,27 +279,40 @@ int main()
                 ourShader.setMat4("transform", obj.model);
                 build.cube.Draw();
             }
-            //选中时显示线框
+        }
+
+        // 第二遍：绘制所有选中物体的轮廓
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+        glStencilMask(0x00);
+        glDepthMask(GL_FALSE); // 禁止写入深度，但仍进行深度测试
+
+        for (auto& obj : build.objects)
+        {
             if (obj.selected)
             {
-                glDisable(GL_DEPTH_TEST);
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
                 lampShader.use();
-                lampShader.setMat4("view", view);
-                lampShader.setMat4("projection", projection);
-
-                glm::mat4 outline = obj.model;
-                outline = glm::scale(outline, glm::vec3(1.03f)); // 稍微放大
-                lampShader.setMat4("model", outline);
-
-                build.cube.Draw();
-
-                // 恢复状态（如果你有 wireframe 开关，恢复它）
-                glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
-                glEnable(GL_DEPTH_TEST);
+                lampShader.setMat4("view",view);
+                lampShader.setMat4("projection",projection);
+                
+                glm::mat4 outlineModel=obj.model;
+                outlineModel=glm::scale(outlineModel,glm::vec3(1.05f));
+                lampShader.setMat4("model",outlineModel);
+                
+                if(obj.type==ObjType::Model&&obj.modelAsset)
+                {
+                    obj.modelAsset->Draw(lampShader);
+                }
+                else
+                {
+                    build.cube.Draw();
+                }
             }
         }
+
+        // 恢复状态
+        glStencilMask(0xFF);
+        glStencilFunc(GL_ALWAYS,0,0xFF);
+        glDepthMask(GL_TRUE);
 
 
         // ===== ImGui draw =====
