@@ -125,6 +125,9 @@ int main()
     glEnable(GL_STENCIL_TEST);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     glStencilMask(0x00);
+
+    //启用面剔除
+    glEnable(GL_CULL_FACE);
     
 
     glm::mat4 view;
@@ -314,6 +317,7 @@ int main()
                 return distA>distB;
             });
         glDepthMask(GL_FALSE);
+        glDisable(GL_CULL_FACE);
         //绘制排序后的透明物体
         for(auto* obj:transparentObjects)
         {
@@ -335,6 +339,7 @@ int main()
             build.quad.Draw();
         }
         glDepthMask(GL_TRUE);
+        glEnable(GL_CULL_FACE);
 
         // 绘制所有选中物体的轮廓
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
