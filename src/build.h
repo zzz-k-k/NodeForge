@@ -160,6 +160,54 @@ public:
         glBindVertexArray(0);
     }
 };
+struct ScreenQuad
+{
+    public:
+    unsigned int quadVAO,quadVBO;
+    void Init()
+    {
+        float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+            // positions   // texCoords
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  0.0f, 0.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+            1.0f,  1.0f,  1.0f, 1.0f
+        };
+
+        //screen quad vao
+        glGenVertexArrays(1,&quadVAO);
+        glGenBuffers(1,&quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER,quadVBO);
+        glBufferData(GL_ARRAY_BUFFER,sizeof(quadVertices),&quadVertices,GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
+
+        //离屏渲染
+        // glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);
+        // glClearColor(0.1f,0.1f,0.1f,1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        // glEnable(GL_DEPTH_TEST);
+        
+        //屏幕渲染
+        // glBindFramebuffer(GL_FRAMEBUFFER,0);
+        // glClearColor(1.0f,1.0f,1.0f,1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT);
+
+    }
+    void Draw()
+    {
+        glBindVertexArray(quadVAO);
+        glDisable(GL_DEPTH_TEST);
+        glDrawArrays(GL_TRIANGLES,0,6);
+    }
+};
+
 
 class BuildSystem
 {
@@ -171,6 +219,8 @@ public:
     int selectedId=-1;
     CubeMesh cube;
     Quad quad;
+
+    ScreenQuad screenquad;
 
     std::shared_ptr<Model> loadModel(const std::string& path)
     {
