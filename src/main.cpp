@@ -292,7 +292,7 @@ int main()
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         //清除深度缓冲和清屏
         glStencilMask(0xFF);
-        //绑定fbo
+        //绑定fbo，相当于激活了fbo，后续的会渲染到fbo上
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);
         glEnable(GL_DEPTH_TEST);
 
@@ -433,8 +433,6 @@ int main()
         glStencilMask(0xFF);
         glStencilFunc(GL_ALWAYS,0,0xFF);
         glDepthMask(GL_TRUE);
-
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
 
         //绘制所有物体
         glBindFramebuffer(GL_FRAMEBUFFER,0);
