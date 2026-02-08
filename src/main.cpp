@@ -30,6 +30,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void drop_callback(GLFWwindow* window,int count, const char** paths);
+unsigned int loadCubemap(vector<std::string> faces);
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f; 
@@ -56,7 +57,50 @@ float cameraControl=false;
 //灯的位置
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
+float skyboxVertices[] = {
+    // positions          
+    -1.0f,  1.0f, -1.0f,
+    -1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
 
+    -1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+
+    -1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f
+};
 
 
 int main()
@@ -151,6 +195,43 @@ int main()
         
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     #pragma endregion
+
+    #pragma region 立方体贴图
+    //纹理加载
+    vector<std::string> faces
+    {
+        "skybox/right.jpg",
+        "skybox/left.jpg",
+        "skybox/top.jpg",
+        "skybox/bottom.jpg",
+        "skybox/front.jpg",
+        "skybox/back.jpg"
+    };
+    stbi_set_flip_vertically_on_load(false);
+    unsigned int cubemapTexture = loadCubemap(faces);
+    stbi_set_flip_vertically_on_load(true);
+    //创建立方体贴图
+    unsigned int textureID;
+    glGenTextures(1,&textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,textureID);
+
+    //遍历整个纹理目标
+    int width,height,nrChannels;
+    unsigned char *data;
+
+    //遍历六个面纹理
+    //faces是六个面的纹理组
+    for(unsigned int i =0;i<faces.size();i++)
+    {
+        data =stbi_load(faces[i].c_str(),&width,&height,&nrChannels,0);
+        glTexImage2D(
+            GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,
+            0,GL_RGB,width,height,0,GL_RGB,GL_UNSIGNED_BYTE,data
+        );
+    }
+
+
+    #pragma endregion
     
     glViewport(0, 0, 800, 600);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -160,6 +241,8 @@ int main()
     Shader gridShader("../../src/gridshader/grid.vs",
                   "../../src/gridshader/grid.fs");
     Shader framebuffers("../../src/shader/framebuffers.vs","../../src/shader/framebuffers.fs");
+    Shader skyboxShader("../../src/shader/cubeshader.vs","../../src/shader/cubeshader.fs");
+
 
     ui.UIinit(window);
 
@@ -197,6 +280,17 @@ int main()
     //------------创建生成纹理对象---------
     unsigned int texture1 = LoadTexture2D("container2.png");
     unsigned int specularMap = LoadTexture2D("container2_specular.png");
+
+    //skyboxvao,skyboxvbo
+    unsigned int skyboxVAO,skyboxVBO;
+    glGenVertexArrays(1,&skyboxVAO);
+    glGenBuffers(1,&skyboxVBO);
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER,skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(skyboxVertices),&skyboxVertices,GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
+    glBindVertexArray(0);
     
     while(!glfwWindowShouldClose(window))
     {
@@ -303,11 +397,33 @@ int main()
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
+
+        #pragma region skybox
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_LEQUAL);
+        skyboxShader.use();
+        skyboxShader.setMat4("projection",projection);
+        glm::mat4 skyboxview=glm::mat4(glm::mat3(camera.GetViewMatrix()));
+        skyboxShader.setMat4("view",skyboxview);
+        skyboxShader.setInt("skybox",0);
+
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,cubemapTexture);
+        glDrawArrays(GL_TRIANGLES,0,36);
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LESS);
+
+        #pragma endregion
         
         ourShader.use();
 
         ourShader.setInt("material.texture_diffuse1", 0);
         ourShader.setInt("material.texture_specular1", 1);
+
+
+        //绘制场景物体
+        #pragma region sceneobjects
 
         // 第一遍：绘制所有不透明物体
         for (auto& obj : build.objects)
@@ -443,6 +559,7 @@ int main()
         framebuffers.setInt("screenTexture",0);
         build.screenquad.Draw();
 
+        #pragma endregion
 
         // ===== ImGui draw =====
         ui.BeginUI();
@@ -608,4 +725,39 @@ void drop_callback(GLFWwindow* window,int count, const char** paths)
     {
         build.ImportModel(paths[i]);
     }
+}
+
+//加载天空盒纹理
+unsigned int loadCubemap(vector<std::string> faces)
+{
+    unsigned int textureID;
+    glGenTextures(1,&textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,textureID);
+
+    int width,height,nrChannels;
+    for(unsigned int i=0;i<faces.size();i++)
+    {
+        unsigned char *data=stbi_load(faces[i].c_str(),&width,&height,&nrChannels,0);
+        if(data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,
+                        0,GL_RGB,width,height,0,GL_RGB,GL_UNSIGNED_BYTE,data
+            );
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout<<"cubemap texture failed to load at path:"<<faces[i]<<std::endl;
+            stbi_image_free(data);
+        }
+    }
+        //设定每个面的环绕啊和过滤方式
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
+
+    return textureID;
+
 }
