@@ -11,9 +11,15 @@ Dev/ImGuizmo/ImGuizmo.cpp
 Dev/nfd/src/nfd_win.cpp
 Dev/nfd/src/nfd_common.c
 Dev/nfd/src/nfd_win.cpp
+Dev/imgui-node-editor/crude_json.cpp
+Dev/imgui-node-editor/imgui_canvas.cpp
+Dev/imgui-node-editor/imgui_node_editor_api.cpp
+Dev/imgui-node-editor/imgui_node_editor.cpp
 )
 
 target_compile_definitions(LearnOpenGL PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
+target_compile_definitions(LearnOpenGL PRIVATE SHADERGRAPH_ENABLE_NODE_EDITOR)
+
 
 target_include_directories(LearnOpenGL PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
@@ -21,6 +27,7 @@ target_include_directories(LearnOpenGL PRIVATE
     "${CMAKE_SOURCE_DIR}/Dev/glm"
     "${CMAKE_SOURCE_DIR}/Dev/ImGuizmo"
     "${CMAKE_SOURCE_DIR}/Dev/nfd/src/include"
+    "${CMAKE_SOURCE_DIR}/Dev/imgui-node-editor"
 )
 
 add_subdirectory(Dev/glfw-3.4)

@@ -16,12 +16,17 @@
 #include<algorithm>
 #include<string>
 
+#include<shadergraph.h>
+
 bool showBuildWindow=false;
+bool showShaderGraphWindow=false;
 
 
 class UI
 {
     public:
+    ShaderGraphUI shaderGraph;
+
     // ===== ImGui init =====
     void UIinit(GLFWwindow* window)
     {
@@ -36,6 +41,9 @@ class UI
         // 绑定到 GLFW + OpenGL3
         ImGui_ImplGlfw_InitForOpenGL(window, false);
         ImGui_ImplOpenGL3_Init("#version 330");
+
+        //初始化shaderui
+        shaderGraph.Init();
     }
     void BeginUI()
     {
@@ -67,6 +75,11 @@ class UI
                         free(outPath);
                     }
                 }
+                ImGui::EndMenu();
+            }
+            if(ImGui::BeginMenu("shader"))
+            {
+                ImGui::MenuItem("Shader Graph",nullptr,&showShaderGraphWindow);
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -105,6 +118,8 @@ class UI
             ImGui::End();
             
         }
+        if(showShaderGraphWindow)
+            shaderGraph.Draw(&showShaderGraphWindow);
 
         //右侧常驻菜单
         ImGuiIO& io=ImGui::GetIO();
@@ -201,6 +216,7 @@ class UI
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
+        shaderGraph.Shutdown();
     }
 
 };
