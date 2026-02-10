@@ -1,3 +1,5 @@
+//使用这些代需要先在cmakelist中定义SHADERGRAPH_ENABLE_NODE_EDITOR
+
 #ifndef SHADERGRAPH_H
 #define SHADERGRAPH_H
 
@@ -7,6 +9,10 @@
 #include "imgui_node_editor.h"
 #include <vector>
 #include <string>
+#include <algorithm>
+
+
+namespace ed=ax::NodeEditor;
 #endif
 
 class ShaderGraphUI
@@ -15,9 +21,12 @@ public:
     void Init()
     {
 #ifdef SHADERGRAPH_ENABLE_NODE_EDITOR
+        //如果没有定义SHADERGRAPH_ENABLE_NODE_EDITOR将不会执行之后的代码
         if (!context)
         {
-            context = ax::NodeEditor::CreateEditor();
+            ed::Config config;
+            config.SettingsFile="ShaderGraph.json";//保存节点位置配置
+            context=ed::CreateEditor(&config);
             BuildDemoGraph();
         }
 #endif
@@ -28,7 +37,7 @@ public:
 #ifdef SHADERGRAPH_ENABLE_NODE_EDITOR
         if (context)
         {
-            ax::NodeEditor::DestroyEditor(context);
+            ed::DestroyEditor(context);
             context = nullptr;
         }
 #endif
@@ -39,42 +48,150 @@ public:
         if (open && !*open)
             return;
 
-        if (open)
-            ImGui::Begin("ShaderGraph", open);
-        else
-            ImGui::Begin("ShaderGraph");
-
-#ifdef SHADERGRAPH_ENABLE_NODE_EDITOR
+        if (!ImGui::Begin("ShaderGraph", open))
+        {
+            ImGui::End();
+            return;
+        }
+        
+        #ifdef SHADERGRAPH_ENABLE_NODE_EDITOR
         ax::NodeEditor::SetCurrentEditor(context);
+        ed::EnableShortcuts(!ImGui::GetIO().WantTextInput);
         ax::NodeEditor::Begin("ShaderGraphEditor");
+        ed::NodeId contextNodeId = 0;
 
         for (const auto& node : nodes)
         {
-            ax::NodeEditor::BeginNode(node.id);
+            ed::BeginNode(node.id);
             ImGui::TextUnformatted(node.name.c_str());
 
             if (node.inputPin != 0)
             {
-                ax::NodeEditor::BeginPin(node.inputPin, ax::NodeEditor::PinKind::Input);
-                ImGui::TextUnformatted("In");
-                ax::NodeEditor::EndPin();
+                ed::BeginPin(node.inputPin, ed::PinKind::Input);
+                ImGui::Text("->In");
+                ed::EndPin();
             }
 
             if (node.outputPin != 0)
             {
-                ax::NodeEditor::BeginPin(node.outputPin, ax::NodeEditor::PinKind::Output);
-                ImGui::TextUnformatted("Out");
-                ax::NodeEditor::EndPin();
+                ed::BeginPin(node.outputPin, ed::PinKind::Output);
+                ImGui::Text("Out->");
+                ed::EndPin();
             }
 
-            ax::NodeEditor::EndNode();
+            ed::EndNode();
         }
 
+        //绘制连线
         for (const auto& link : links)
-            ax::NodeEditor::Link(link.id, link.startPin, link.endPin);
+            ed::Link(link.id, link.startPin, link.endPin);
 
-        ax::NodeEditor::End();
-        ax::NodeEditor::SetCurrentEditor(nullptr);
+        //处理交互，创建连线
+        if(ed::BeginCreate())
+        {
+            ed::PinId inputPinId,outputPinId;
+            if(ed::QueryNewLink(&inputPinId,&outputPinId))
+            {
+                if(inputPinId&&outputPinId)
+                {
+                    if(ed::AcceptNewItem())
+                    {
+                        links.push_back({GetNextId(),(int)inputPinId.Get(),(int)outputPinId.Get()});
+                    }
+                }
+            }
+            ed::EndCreate();
+        }
+
+        //处理交互，删除
+        if(ed::BeginDelete())
+        {
+            ed::LinkId deletedLinkId;
+            //循环查询被选中的连线
+            while(ed::QueryDeletedLink(&deletedLinkId))
+            {
+                if(ed::AcceptDeletedItem())
+                {
+                    links.erase(std::remove_if(links.begin(),links.end(),
+                    [deletedLinkId](const Link& link){return link.id==deletedLinkId.Get();}),
+                    links.end());
+                }
+            }
+
+            ed::NodeId deletedNodeId;
+
+            //循环查询被选中的节点
+            while(ed::QueryDeletedNode(&deletedNodeId))
+            {
+                if(ed::AcceptDeletedItem())
+                {
+                    int nodeIdInt=(int)deletedNodeId.Get();
+                    auto it=std::find_if(nodes.begin(),nodes.end(),[nodeIdInt](const Node& n){return n.id==nodeIdInt;});
+                    if(it!=nodes.end())
+                    {
+                        int inPin=it->inputPin;
+                        int outPin=it->outputPin;
+                        //删除这些pin的所有连线
+                        links.erase(std::remove_if(links.begin(),links.end(),
+                                    [inPin,outPin](const Link& l)
+                                    {
+                                        return l.startPin==outPin||l.endPin==inPin||l.startPin==inPin||l.endPin==outPin;
+                                    }),links.end());
+                    }
+                    //从vector中移出节点
+                    nodes.erase(std::remove_if(nodes.begin(),nodes.end(),
+                                [nodeIdInt](const Node& n){return n.id==nodeIdInt;}),
+                                nodes.end());
+                }
+            }
+            ed::EndDelete();
+        }
+
+        //处理右键菜单
+        ed::Suspend();
+        if(ed::ShowNodeContextMenu(&contextNodeId))
+        {
+            ImGui::OpenPopup("NodeContextMenu");
+        }
+        else if(ed::ShowBackgroundContextMenu())
+        {
+            ImGui::OpenPopup("CreateNodeMenu");
+        }
+        if(ImGui::BeginPopup("CreateNodeMenu"))
+        {
+            ImGui::Text("Create Node:");
+            ImGui::Separator();
+
+            if(ImGui::MenuItem("Add teexture2D"))
+            {
+                CreateNode("Texture2D",false,true);
+            }
+            if(ImGui::MenuItem("Add Multiply"))
+            {
+                CreateNode("Multply",true,true);
+            }
+            if(ImGui::MenuItem("Add Output"))
+            {
+                CreateNode("Output",true,false);
+            }
+            ImGui::EndPopup();
+        }
+        if(ImGui::BeginPopup("NodeContextMenu"))
+        {
+            ImGui::Text("Node");
+            ImGui::Separator();
+            if(ImGui::MenuItem("Delete"))
+            {
+                ed::DeleteNode(contextNodeId);
+                //todo 这里有bug，删除逻辑没有正常工作
+            }
+            ImGui::EndPopup();
+        }
+
+        ed::Resume();
+        ed::End();
+        ed::SetCurrentEditor(nullptr);
+
 #else
         ImGui::TextUnformatted("imgui-node-editor is not enabled.");
         ImGui::Spacing();
@@ -104,6 +221,23 @@ private:
     ax::NodeEditor::EditorContext* context = nullptr;
     std::vector<Node> nodes;
     std::vector<Link> links;
+    int uniqueIdCounter=1000;
+
+    //生成唯一id
+    int GetNextId()
+    {
+        return uniqueIdCounter++;
+    }
+
+    void CreateNode(const std::string& name,bool hasInput,bool hasOutput)
+    {
+        int nodeId=GetNextId();
+        int inPin=hasInput?GetNextId():0;
+        int outPin=hasOutput?GetNextId():0;
+
+        nodes.push_back({nodeId,inPin,outPin,name});
+        ed::SetNodePosition(nodeId,ed::ScreenToCanvas(ImGui::GetMousePos()));
+    }
 
     void BuildDemoGraph()
     {

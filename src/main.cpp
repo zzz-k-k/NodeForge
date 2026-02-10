@@ -31,6 +31,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void drop_callback(GLFWwindow* window,int count, const char** paths);
 unsigned int loadCubemap(vector<std::string> faces);
+void resizeFramebufferAttachments(int width, int height);
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f; 
@@ -56,6 +57,12 @@ float cameraControl=false;
 
 //灯的位置
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+
+static unsigned int gFBO = 0;
+static unsigned int gColorTex = 0;
+static unsigned int gRBO = 0;
+static int gFbWidth = 0;
+static int gFbHeight = 0;
 
 float skyboxVertices[] = {
     // positions          
@@ -151,18 +158,23 @@ int main()
 
     #pragma region 帧缓冲
     //创建一个帧缓冲
+    int fbWidth = 0, fbHeight = 0;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
     unsigned int fbo;
     glGenFramebuffers(1,&fbo);
     glBindFramebuffer(GL_FRAMEBUFFER,fbo);
+    gFBO = fbo;
 
     //创建颜色纹理附件
     unsigned int colorTex;
     glGenTextures(1,&colorTex);
     glBindTexture(GL_TEXTURE_2D,colorTex);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,800,600,0,GL_RGB,GL_UNSIGNED_BYTE,NULL);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,fbWidth,fbHeight,0,GL_RGB,GL_UNSIGNED_BYTE,NULL);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,colorTex,0);
+    gColorTex = colorTex;
 
 
     //glDeleteFramebuffers(1,&fbo);//删除帧缓冲对象
@@ -186,14 +198,16 @@ int main()
     unsigned int rbo;
     glGenRenderbuffers(1,&rbo);
     glBindRenderbuffer(GL_RENDERBUFFER,rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 800, 600);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbWidth, fbHeight);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    gRBO = rbo;
     
     //检查帧缓冲是否完整
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)
         std::cout<<"ERROR::FRAMEBUFFER::framebuffer is not complete"<<std::endl;
         
     glBindFramebuffer(GL_FRAMEBUFFER,0);
+    resizeFramebufferAttachments(fbWidth, fbHeight);
     #pragma endregion
 
     #pragma region 立方体贴图
@@ -311,8 +325,12 @@ int main()
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-
-        processInput(window);
+        
+        ImGuiIO& io=ImGui::GetIO();
+        if(!io.WantCaptureKeyboard)
+        {
+            processInput(window);
+        }
         
         ourShader.use();        
         
@@ -616,6 +634,27 @@ int main()
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+    resizeFramebufferAttachments(width, height);
+}
+
+void resizeFramebufferAttachments(int width, int height)
+{
+    if (width <= 0 || height <= 0) return;
+    if (width == gFbWidth && height == gFbHeight) return;
+    if (gColorTex != 0)
+    {
+        glBindTexture(GL_TEXTURE_2D, gColorTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    if (gRBO != 0)
+    {
+        glBindRenderbuffer(GL_RENDERBUFFER, gRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    }
+    gFbWidth = width;
+    gFbHeight = height;
 }
 
 void processInput(GLFWwindow *window)
@@ -644,6 +683,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
 
     if(!cameraControl) return;
+    if(ImGui::GetIO().WantCaptureMouse)
+        return;
 
     if(firstMouse)
     {
@@ -663,6 +704,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+    if(ImGui::GetIO().WantCaptureMouse)
+        return;
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
         // 如果 ImGui 正在使用鼠标，就不选
