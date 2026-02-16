@@ -20,6 +20,9 @@
 
 bool showBuildWindow=false;
 bool showShaderGraphWindow=false;
+bool useSkybox=false;
+bool enableDirlight=true;
+bool useBlinnPhongShader=false;
 
 
 class UI
@@ -115,6 +118,9 @@ class UI
                         free(outPath);
                     }
             }
+            ImGui::Checkbox("skybox",&useSkybox);
+            ImGui::Checkbox("dirlight",&enableDirlight);
+            ImGui::Checkbox("useBlinPhongShader",&useBlinnPhongShader);
             ImGui::End();
             
         }

@@ -25,7 +25,7 @@
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
-unsigned int LoadTexture2D(const char* path);
+unsigned int LoadTexture2D(const char* path,bool useSrgb=false);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -292,8 +292,8 @@ int main()
     glfwSetDropCallback(window, drop_callback);
 
     //------------创建生成纹理对象---------
-    unsigned int texture1 = LoadTexture2D("container2.png");
-    unsigned int specularMap = LoadTexture2D("container2_specular.png");
+    unsigned int texture1 = LoadTexture2D("container2.png",true);
+    unsigned int specularMap = LoadTexture2D("container2_specular.png",false);
 
     //skyboxvao,skyboxvbo
     unsigned int skyboxVAO,skyboxVBO;
@@ -344,15 +344,24 @@ int main()
         
         ourShader.setVec3("viewPos",camera.Position);
         
-
-        ourShader.setFloat("material.shininess",32.0f);
+        //材质的反光度
+        ourShader.setFloat("material.shininess",1.0f);
+        
         //材质
-        
         ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-        ourShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-        ourShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-        
+        if(enableDirlight)
+        {
+            ourShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
+            ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+            ourShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+        }
+        else
+        {
+            ourShader.setVec3("dirLight.ambient", 0.0f, 0.0f, 0.0f);
+            ourShader.setVec3("dirLight.diffuse", 0.0f, 0.0f, 0.0f);
+            ourShader.setVec3("dirLight.specular", 0.0f, 0.0f, 0.0f);
+        }
+        ourShader.setBool("blinn",useBlinnPhongShader);
         //pointlight
         int lightindex=0;
         const int maxLights=8;
@@ -401,7 +410,8 @@ int main()
         // 用 UI 控制渲染状态/参数（示例）
         glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
         
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        //此处修改背景颜色
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         //清除深度缓冲和清屏
         glStencilMask(0xFF);
         //绑定fbo，相当于激活了fbo，后续的会渲染到fbo上
@@ -417,20 +427,23 @@ int main()
         glBindTexture(GL_TEXTURE_2D, specularMap);
 
         #pragma region skybox
-        glDepthMask(GL_FALSE);
-        glDepthFunc(GL_LEQUAL);
-        skyboxShader.use();
-        skyboxShader.setMat4("projection",projection);
-        glm::mat4 skyboxview=glm::mat4(glm::mat3(camera.GetViewMatrix()));
-        skyboxShader.setMat4("view",skyboxview);
-        skyboxShader.setInt("skybox",0);
-
-        glBindVertexArray(skyboxVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP,cubemapTexture);
-        glDrawArrays(GL_TRIANGLES,0,36);
-        glDepthMask(GL_TRUE);
-        glDepthFunc(GL_LESS);
+        if(useSkybox)
+        {
+            glDepthMask(GL_FALSE);
+            glDepthFunc(GL_LEQUAL);
+            skyboxShader.use();
+            skyboxShader.setMat4("projection",projection);
+            glm::mat4 skyboxview=glm::mat4(glm::mat3(camera.GetViewMatrix()));
+            skyboxShader.setMat4("view",skyboxview);
+            skyboxShader.setInt("skybox",0);
+    
+            glBindVertexArray(skyboxVAO);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP,cubemapTexture);
+            glDrawArrays(GL_TRIANGLES,0,36);
+            glDepthMask(GL_TRUE);
+            glDepthFunc(GL_LESS);
+        }
 
         #pragma endregion
         
@@ -510,7 +523,7 @@ int main()
         for(auto* obj:transparentObjects)
         {
             if(obj->textureID==0&&!obj->texturePath.empty())
-                obj->textureID=LoadTexture2D(obj->texturePath.c_str());
+                obj->textureID=LoadTexture2D(obj->texturePath.c_str(),true);
 
             glStencilMask(0x00);
             if(obj->selected)
@@ -731,7 +744,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 //加载纹理对象
-unsigned int LoadTexture2D(const char* path)
+//添加参数是否使用srgb
+unsigned int LoadTexture2D(const char* path,bool useSrgb)
 {
     unsigned int tex;
     glGenTextures(1, &tex);
@@ -747,9 +761,19 @@ unsigned int LoadTexture2D(const char* path)
     unsigned char* data = stbi_load(path, &w, &h, &c, 0);
     if (data)
     {
-        GLenum format = (c == 4) ? GL_RGBA : GL_RGB;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        if(useSrgb)
+        {
+            GLenum format = (c == 4) ? GL_RGBA : GL_RGB;
+            GLenum internalFormat=(c==4)?GL_SRGB_ALPHA:GL_SRGB;
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        else
+        {
+            GLenum format = (c == 4) ? GL_RGBA : GL_RGB;
+            glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
     }
     else
     {
@@ -770,7 +794,7 @@ void drop_callback(GLFWwindow* window,int count, const char** paths)
     }
 }
 
-//加载天空盒纹理
+//加载天空盒纹理LDR
 unsigned int loadCubemap(vector<std::string> faces)
 {
     unsigned int textureID;
