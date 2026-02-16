@@ -22,7 +22,8 @@
 #include<algorithm>
 #include<vector>
 
-
+void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::mat4 projection);
+void drawDepthObjects(Shader& depthShader);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 unsigned int LoadTexture2D(const char* path,bool useSrgb=false);
@@ -210,6 +211,28 @@ int main()
     resizeFramebufferAttachments(fbWidth, fbHeight);
     #pragma endregion
 
+    #pragma region 深度贴图
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1,&depthMapFBO);
+    //创建2d纹理提供给帧缓冲的深度缓冲使用
+    const unsigned int SHADOW_WIDTH=1024,SHADOW_HEIGHT=1024;
+    unsigned int depthMap;
+    glGenTextures(1,&depthMap);
+    glBindTexture(GL_TEXTURE_2D,depthMap);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT,SHADOW_WIDTH,SHADOW_HEIGHT,0,GL_DEPTH_COMPONENT,GL_FLOAT,NULL);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+    
+    //将生成的深度纹理作为帧缓冲的深度缓冲
+    glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,depthMap,0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    #pragma endregion
+
     #pragma region 立方体贴图
     //纹理加载
     vector<std::string> faces
@@ -256,6 +279,7 @@ int main()
                   "../../src/gridshader/grid.fs");
     Shader framebuffers("../../src/shader/framebuffers.vs","../../src/shader/framebuffers.fs");
     Shader skyboxShader("../../src/shader/cubeshader.vs","../../src/shader/cubeshader.fs");
+    Shader depthShader("../../src/shader/depthshader.vs","../../src/shader/depthshader.fs");
 
 
     ui.UIinit(window);
@@ -306,6 +330,16 @@ int main()
     glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
     glBindVertexArray(0);
     
+    //光源空间的变换矩阵
+    float near_plane=1.0f,far_plane=7.5f;
+    glm::mat4 lightProjection=glm::ortho(-10.0f,10.0f,-10.0f,10.0f,near_plane,far_plane);
+    glm::mat4 lightview=glm::lookAt(
+        glm::vec3(-2.0f,4.0f,-1.0f),
+        glm::vec3(0.0f,0.0f,0.0f),
+        glm::vec3(0.0f,1.0f,0.0f)
+    );
+    glm::mat4 lightSpaceMatrix=lightProjection*lightview;
+
     while(!glfwWindowShouldClose(window))
     {
         //检查是否按下右键
@@ -332,7 +366,11 @@ int main()
             processInput(window);
         }
         
-        ourShader.use();        
+        ourShader.use();    
+        
+        //设置阴影
+        ourShader.setInt("shadowMap",2);
+        ourShader.setMat4("lightSpaceMatrix",lightSpaceMatrix);
         
         glm::mat4 view = camera.GetViewMatrix(); 
         ourShader.setMat4("view",view);
@@ -407,6 +445,19 @@ int main()
         lampShader.setMat4("projection",projection);
         lampShader.setMat4("model",model);
         
+        #pragma region 生成深度贴图
+        glEnable(GL_DEPTH_TEST);
+        depthShader.use();
+        depthShader.setMat4("lightSpaceMatrix",lightSpaceMatrix);
+        depthShader.setMat4("model",model);
+        glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        drawDepthObjects(depthShader);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        glViewport(0, 0, width, height);
+        #pragma endregion
+        
         // 用 UI 控制渲染状态/参数（示例）
         glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
         
@@ -425,6 +476,9 @@ int main()
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D,depthMap);
 
         #pragma region skybox
         if(useSkybox)
@@ -457,44 +511,7 @@ int main()
         #pragma region sceneobjects
 
         // 第一遍：绘制所有不透明物体
-        for (auto& obj : build.objects)
-        {
-            //跳过透明物体
-            if(obj.type==ObjType::Image)continue;
-
-            // 默认不写入模板
-            glStencilMask(0x00);
-
-            if(obj.selected)
-            {
-                // 如果被选中，允许写入模板，且值设为 1
-                glStencilFunc(GL_ALWAYS, 1, 0xFF);
-                glStencilMask(0xFF);
-            }
-
-            if(obj.type==ObjType::Light)
-            {
-                lampShader.use();
-                lampShader.setMat4("view", view);
-                lampShader.setMat4("projection", projection);
-
-                lampShader.setMat4("model",obj.model);
-                build.cube.Draw();
-            }
-            else if(obj.type==ObjType::Model&&obj.modelAsset)
-            {
-                ourShader.use();
-                ourShader.setMat4("transform",obj.model);
-                obj.modelAsset->Draw(ourShader);
-            }
-            
-            else //cube
-            {
-                ourShader.use();
-                ourShader.setMat4("transform", obj.model);
-                build.cube.Draw();
-            }
-        }
+        drawOpaqueObject(lampShader,ourShader,view,projection);
         //绘制透明物体
         //收集透明物体
         std::vector<SceneObject*> transparentObjects;
@@ -642,6 +659,74 @@ int main()
 
 
     return 0;
+}
+
+void drawDepthObjects(Shader& depthShader)
+{
+    depthShader.use();
+
+    for (auto& obj : build.objects)
+    {
+        // 透明物体一般不参与阴影深度图
+        if (obj.type == ObjType::Image) continue;
+
+        // 灯的可视化几何体通常不作为遮挡物（可按需删掉）
+        if (obj.type == ObjType::Light) continue;
+
+        depthShader.setMat4("model", obj.model);
+
+        if (obj.type == ObjType::Model && obj.modelAsset)
+        {
+            obj.modelAsset->Draw(depthShader);
+        }
+        else
+        {
+            // 你当前场景里的基础几何体
+            build.cube.Draw();
+        }
+    }
+}
+
+void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::mat4 projection)
+{
+    for (auto& obj : build.objects)
+    {
+        //跳过透明物体
+        if(obj.type==ObjType::Image)continue;
+
+        // 默认不写入模板
+        glStencilMask(0x00);
+
+        if(obj.selected)
+        {
+            // 如果被选中，允许写入模板，且值设为 1
+            glStencilFunc(GL_ALWAYS, 1, 0xFF);
+            glStencilMask(0xFF);
+        }
+
+        if(obj.type==ObjType::Light)
+        {
+            lampShader.use();
+            lampShader.setMat4("view", view);
+            lampShader.setMat4("projection", projection);
+
+            lampShader.setMat4("model",obj.model);
+            build.cube.Draw();
+        }
+        else if(obj.type==ObjType::Model&&obj.modelAsset)
+        {
+            ourShader.use();
+            ourShader.setMat4("transform",obj.model);
+            obj.modelAsset->Draw(ourShader);
+        }
+        
+        else //cube
+        {
+            ourShader.use();
+            ourShader.setMat4("transform", obj.model);
+            build.cube.Draw();
+        }
+    }
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)

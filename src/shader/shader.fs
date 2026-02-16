@@ -6,9 +6,14 @@ in vec3 Normal;
 
 in vec3 FragPos;
 
+//阴影
+in vec4 FragPosLightSpace;
+
 uniform vec3 viewPos;
 
 uniform bool blinn;
+
+uniform sampler2D shadowMap;
 
 //光源数组数量控制
 #define MAX_POINT_LIGHT 8
@@ -67,6 +72,18 @@ uniform PointLight pointLights[MAX_POINT_LIGHT];
 vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 
+float ShadowCalculation(vec4 fragPosLightSpace)
+{
+    //透视除法
+    vec3 projCoords=fragPosLightSpace.xyz/fragPosLightSpace.w;
+    projCoords=projCoords*0.5+0.5;
+    float closestDepth=texture(shadowMap,projCoords.xy).r;
+    float currentDepth=projCoords.z;
+    float shadow=currentDepth>closestDepth?1.0:0.0;
+
+    return shadow;
+}
+
 void main()
 {
     //获取alpha
@@ -89,7 +106,7 @@ void main()
     
 }
 
-//环境光
+//环境光和阴影
 vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir)
 {
     vec3 lightDir=normalize(-light.direction);
@@ -98,11 +115,13 @@ vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir)
     //镜面光着色
     vec3 reflectDir=reflect(-lightDir,normal);
     float spec=pow(max(dot(viewDir,reflectDir),0.0),material.shininess);
+    //计算阴影
+    float shadow=ShadowCalculation(FragPosLightSpace);
     //合并
     vec3 ambient=dirLight.ambient*vec3(texture(material.texture_diffuse1,TexCoord));
     vec3 diffuse=dirLight.diffuse*diff*vec3(texture(material.texture_diffuse1,TexCoord));
     vec3 specular = dirLight.specular * spec * vec3(texture(material.texture_specular1, TexCoord));
-    return (ambient + diffuse + specular);
+    return (ambient + (1.0-shadow)*(diffuse + specular));
 }
 
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
