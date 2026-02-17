@@ -9,6 +9,10 @@ in vec3 FragPos;
 //阴影
 in vec4 FragPosLightSpace;
 
+//点光源阴影
+uniform samplerCube depthMap;
+uniform float far_plane;
+
 uniform vec3 viewPos;
 
 uniform bool blinn;
@@ -101,6 +105,17 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     return shadow;
 }
 
+float DirShadowCalculation(vec3 fragPos,vec3 lightPos)
+{
+    vec3 fragToLight=fragPos-lightPos;
+    float closestDepth=texture(depthMap,fragToLight).r;
+    closestDepth*=far_plane;
+    float currentDepth=length(fragToLight);
+    float bias=0.05;
+    float shadow=currentDepth-bias>closestDepth?1.0:0.0;
+    return shadow;
+}
+
 void main()
 {
     //获取alpha
@@ -141,6 +156,7 @@ vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir)
     return (ambient + (1.0-shadow)*(diffuse + specular));
 }
 
+//点光源和阴影
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
     vec3 lightDir = normalize(light.position - fragPos);
@@ -169,5 +185,9 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     ambient  *= attenuation;
     diffuse  *= attenuation;
     specular *= attenuation;
-    return (ambient + diffuse + specular);
+
+    //阴影
+    float shadow=DirShadowCalculation(FragPos,light.position);
+
+    return (ambient + (1.0-shadow)*(diffuse + specular));
 }

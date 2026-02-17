@@ -283,7 +283,8 @@ int main()
     Shader skyboxShader("../../src/shader/cubeshader.vs","../../src/shader/cubeshader.fs");
     Shader depthShader("../../src/shader/depthshader.vs","../../src/shader/depthshader.fs");
 
-
+    Shader pointdepthShader("../../src/shader/depth/pointdepthshader.vs","../../src/shader/depth/pointdepthshader.fs","../../src/shader/depth/pointdepthshader.gs");
+    
     ui.UIinit(window);
 
     Grid grid;
@@ -341,7 +342,49 @@ int main()
         glm::vec3(0.0f,1.0f,0.0f)
     );
     glm::mat4 lightSpaceMatrix=lightProjection*lightview;
+    
+    //点光源空间的变换矩阵
+    GLfloat aspect=(GLfloat)SHADOW_WIDTH/(GLfloat)SHADOW_HEIGHT;
+    GLfloat near=1.0f;
+    GLfloat far=25.0f;
+    glm::mat4 shadowProj=glm::perspective(glm::radians(90.0f),aspect,near,far);
+    //创建六个观察方向
+    std::vector<glm::mat4> shadowTransforms;
+    shadowTransforms.push_back(shadowProj*
+                    glm::lookAt(lightPos,lightPos+glm::vec3(1.0,0.0,0.0),glm::vec3(0.0,-1.0,0.0)));
+    shadowTransforms.push_back(shadowProj * 
+                    glm::lookAt(lightPos, lightPos + glm::vec3(-1.0,0.0,0.0), glm::vec3(0.0,-1.0,0.0)));
+    shadowTransforms.push_back(shadowProj * 
+                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,1.0,0.0), glm::vec3(0.0,0.0,1.0)));
+    shadowTransforms.push_back(shadowProj * 
+                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,-1.0,0.0), glm::vec3(0.0,0.0,-1.0)));
+    shadowTransforms.push_back(shadowProj * 
+                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,0.0,1.0), glm::vec3(0.0,-1.0,0.0)));
+    shadowTransforms.push_back(shadowProj * 
+                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,0.0,-1.0), glm::vec3(0.0,-1.0,0.0)));
 
+
+    //生成深度立方体贴图
+    GLuint depthCubemap;
+    unsigned depthMapFBO_point;
+    glGenFramebuffers(1,&depthMapFBO_point);
+    glGenTextures(1,&depthCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,depthCubemap);
+    for(GLuint i=0;i<6;++i)
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_DEPTH_COMPONENT,
+            SHADOW_WIDTH,SHADOW_WIDTH,0,GL_DEPTH_COMPONENT,GL_FLOAT,NULL);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO_point);
+    glFramebufferTexture(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,depthCubemap,0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    
     while(!glfwWindowShouldClose(window))
     {
         //检查是否按下右键
@@ -367,8 +410,12 @@ int main()
         {
             processInput(window);
         }
-        
+
+
         ourShader.use();    
+
+        ourShader.setFloat("far_plane",far);
+        ourShader.setInt("depthMap",3);
         
         //设置阴影
         ourShader.setInt("shadowMap",2);
@@ -452,12 +499,35 @@ int main()
         depthShader.use();
         depthShader.setMat4("lightSpaceMatrix",lightSpaceMatrix);
         depthShader.setMat4("model",model);
+        
         glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT);
         glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
         drawDepthObjects(depthShader);
         glBindFramebuffer(GL_FRAMEBUFFER,0);
         glViewport(0, 0, width, height);
+        #pragma endregion
+
+        #pragma region 生成深度立方体贴图
+        
+        
+        pointdepthShader.use();
+        pointdepthShader.setVec3("lightPos",lightPos);
+        pointdepthShader.setMat4("shadowMatrices[0]",shadowTransforms[0]);
+        pointdepthShader.setMat4("shadowMatrices[1]",shadowTransforms[1]);
+        pointdepthShader.setMat4("shadowMatrices[2]",shadowTransforms[2]);
+        pointdepthShader.setMat4("shadowMatrices[3]",shadowTransforms[3]);
+        pointdepthShader.setMat4("shadowMatrices[4]",shadowTransforms[4]);
+        pointdepthShader.setMat4("shadowMatrices[5]",shadowTransforms[5]);
+        pointdepthShader.setFloat("far_plane",far);
+
+        glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO_point);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        drawDepthObjects(pointdepthShader);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        glViewport(0, 0, width, height);
+
         #pragma endregion
         
         // 用 UI 控制渲染状态/参数（示例）
@@ -481,6 +551,9 @@ int main()
 
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D,depthMap);
+
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,depthCubemap);
 
         #pragma region skybox
         if(useSkybox)
