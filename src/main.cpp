@@ -226,11 +226,13 @@ int main()
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
     
     //将生成的深度纹理作为帧缓冲的深度缓冲
+    glCullFace(GL_FRONT);
     glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,depthMap,0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
+    glCullFace(GL_BACK);
     #pragma endregion
 
     #pragma region 立方体贴图
@@ -836,8 +838,10 @@ unsigned int LoadTexture2D(const char* path,bool useSrgb)
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[]={1.0,1.0,1.0,1.0};
+    glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,borderColor);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 

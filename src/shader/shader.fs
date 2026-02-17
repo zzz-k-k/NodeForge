@@ -72,14 +72,31 @@ uniform PointLight pointLights[MAX_POINT_LIGHT];
 vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 
-float ShadowCalculation(vec4 fragPosLightSpace)
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 {
     //透视除法
     vec3 projCoords=fragPosLightSpace.xyz/fragPosLightSpace.w;
     projCoords=projCoords*0.5+0.5;
     float closestDepth=texture(shadowMap,projCoords.xy).r;
     float currentDepth=projCoords.z;
-    float shadow=currentDepth>closestDepth?1.0:0.0;
+
+    float bias=max(0.05*(1.0-dot(normal,lightDir)),0.005);
+    
+    //paf实现采样深度贴图周边纹理像素并取平均值
+    float shadow=0.0;
+    vec2 texelSize=1.0/textureSize(shadowMap,0);
+    for(int x=-1;x<=1;++x)
+    {
+        for(int y=-1;y<=1;++y)
+        {
+            float pcfDepth=texture(shadowMap,projCoords.xy+vec2(x,y)*texelSize).r;
+            shadow+=currentDepth-bias>pcfDepth?1.0:0.0;
+        }
+    }
+    shadow/=9;
+
+    if(projCoords.z>1.0)
+        shadow=0.0;
 
     return shadow;
 }
@@ -116,7 +133,7 @@ vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir)
     vec3 reflectDir=reflect(-lightDir,normal);
     float spec=pow(max(dot(viewDir,reflectDir),0.0),material.shininess);
     //计算阴影
-    float shadow=ShadowCalculation(FragPosLightSpace);
+    float shadow=ShadowCalculation(FragPosLightSpace, normal, lightDir);
     //合并
     vec3 ambient=dirLight.ambient*vec3(texture(material.texture_diffuse1,TexCoord));
     vec3 diffuse=dirLight.diffuse*diff*vec3(texture(material.texture_diffuse1,TexCoord));
