@@ -222,8 +222,8 @@ int main()
     glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT,SHADOW_WIDTH,SHADOW_HEIGHT,0,GL_DEPTH_COMPONENT,GL_FLOAT,NULL);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     
     //将生成的深度纹理作为帧缓冲的深度缓冲
     glCullFace(GL_FRONT);
@@ -348,22 +348,7 @@ int main()
     GLfloat near=1.0f;
     GLfloat far=25.0f;
     glm::mat4 shadowProj=glm::perspective(glm::radians(90.0f),aspect,near,far);
-    //创建六个观察方向
-    std::vector<glm::mat4> shadowTransforms;
-    shadowTransforms.push_back(shadowProj*
-                    glm::lookAt(lightPos,lightPos+glm::vec3(1.0,0.0,0.0),glm::vec3(0.0,-1.0,0.0)));
-    shadowTransforms.push_back(shadowProj * 
-                    glm::lookAt(lightPos, lightPos + glm::vec3(-1.0,0.0,0.0), glm::vec3(0.0,-1.0,0.0)));
-    shadowTransforms.push_back(shadowProj * 
-                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,1.0,0.0), glm::vec3(0.0,0.0,1.0)));
-    shadowTransforms.push_back(shadowProj * 
-                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,-1.0,0.0), glm::vec3(0.0,0.0,-1.0)));
-    shadowTransforms.push_back(shadowProj * 
-                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,0.0,1.0), glm::vec3(0.0,-1.0,0.0)));
-    shadowTransforms.push_back(shadowProj * 
-                    glm::lookAt(lightPos, lightPos + glm::vec3(0.0,0.0,-1.0), glm::vec3(0.0,-1.0,0.0)));
-
-
+    
     //生成深度立方体贴图
     GLuint depthCubemap;
     unsigned depthMapFBO_point;
@@ -510,9 +495,35 @@ int main()
 
         #pragma region 生成深度立方体贴图
         
-        
+        glm::vec3 shadowCasterPos = lightPos; // fallback
+        bool foundShadowCaster = false;
+
+        for (const auto& obj : build.objects)
+        {
+            if (obj.type == ObjType::Light)
+            {
+                shadowCasterPos = glm::vec3(obj.model[3]); // 从模型矩阵取平移分量
+                foundShadowCaster = true;
+                break; // 先用第一盏灯作为投影灯
+            }
+        }
+        //创建六个观察方向
+        std::vector<glm::mat4> shadowTransforms;
+        shadowTransforms.push_back(shadowProj*
+                        glm::lookAt(shadowCasterPos,shadowCasterPos+glm::vec3(1.0,0.0,0.0),glm::vec3(0.0,-1.0,0.0)));
+        shadowTransforms.push_back(shadowProj * 
+                        glm::lookAt(shadowCasterPos, shadowCasterPos + glm::vec3(-1.0,0.0,0.0), glm::vec3(0.0,-1.0,0.0)));
+        shadowTransforms.push_back(shadowProj * 
+                        glm::lookAt(shadowCasterPos, shadowCasterPos + glm::vec3(0.0,1.0,0.0), glm::vec3(0.0,0.0,1.0)));
+        shadowTransforms.push_back(shadowProj * 
+                        glm::lookAt(shadowCasterPos, shadowCasterPos + glm::vec3(0.0,-1.0,0.0), glm::vec3(0.0,0.0,-1.0)));
+        shadowTransforms.push_back(shadowProj * 
+                        glm::lookAt(shadowCasterPos, shadowCasterPos + glm::vec3(0.0,0.0,1.0), glm::vec3(0.0,-1.0,0.0)));
+        shadowTransforms.push_back(shadowProj * 
+                        glm::lookAt(shadowCasterPos, shadowCasterPos + glm::vec3(0.0,0.0,-1.0), glm::vec3(0.0,-1.0,0.0)));
+
         pointdepthShader.use();
-        pointdepthShader.setVec3("lightPos",lightPos);
+        pointdepthShader.setVec3("lightPos",shadowCasterPos);
         pointdepthShader.setMat4("shadowMatrices[0]",shadowTransforms[0]);
         pointdepthShader.setMat4("shadowMatrices[1]",shadowTransforms[1]);
         pointdepthShader.setMat4("shadowMatrices[2]",shadowTransforms[2]);
