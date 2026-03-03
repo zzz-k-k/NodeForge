@@ -9,6 +9,9 @@ in vec3 FragPos;
 //阴影
 in vec4 FragPosLightSpace;
 
+//TBN矩阵
+in mat3 TBN;
+
 //点光源阴影
 uniform samplerCube depthMap;
 uniform float far_plane;
@@ -22,6 +25,9 @@ uniform sampler2D shadowMap;
 //光源数组数量控制
 #define MAX_POINT_LIGHT 8
 uniform int numPointLights;
+
+//法线贴图
+uniform sampler2D normalMap;
 
 
 struct Material{
@@ -73,8 +79,8 @@ struct PointLight {
 
 uniform PointLight pointLights[MAX_POINT_LIGHT];
 
-vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir);
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir,mat3 TBN);
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir,mat3 TBN);
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 {
@@ -99,7 +105,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     }
     shadow/=9;
 
-    if(projCoords.z>1.0&&projCoords.x>1.0&&projCoords.y>1.0)
+    if(projCoords.z>1.0||projCoords.x>1.0||projCoords.y>1.0)
         shadow=0.0;
 
     return shadow;
@@ -123,14 +129,25 @@ void main()
     float alpha = texColor.a;
 
     // 属性
-    vec3 norm = normalize(Normal);
-    vec3 viewDir = normalize(viewPos - FragPos);
+    //vec3 norm = normalize(Normal);
+    vec3 normal = texture(normalMap,TexCoord).rgb;
+    // 将法线向量转换为范围[-1,1]
+    vec3 norm = normalize(normal * 2.0 - 1.0);  
+    //处理tbn
+    vec3 tangentViewPos=TBN*viewPos;
+    vec3 tangentFragPos=TBN*FragPos;
+    
+    vec3 viewDir = normalize(tangentViewPos - tangentFragPos);
 
     // 第一阶段：定向光照
-    vec3 result = CalcDirLight(dirLight, norm, viewDir);
+    //vec3 tangentDirLight=TBN*dirLight.direction;
+    vec3 result = CalcDirLight(dirLight, norm, viewDir,TBN);
     // 第二阶段：点光源
     for(int i = 0; i < numPointLights; i++)
-        result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);    
+    {
+        //vec3 tangentposition=TBN*pointLights[i].position;
+        result += CalcPointLight(pointLights[i], norm, FragPos, viewDir,TBN);    
+    }
     // 第三阶段：聚光
     //result += CalcSpotLight(spotLight, norm, FragPos, viewDir);    
 
@@ -139,13 +156,14 @@ void main()
 }
 
 //环境光和阴影
-vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir)
+vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir,mat3 TBN)
 {
     vec3 lightDir=normalize(-light.direction);
+    vec3 tangentDirLight=TBN*lightDir;
     //漫反射着色
-    float diff=max(dot(normal,lightDir),0.0);
+    float diff=max(dot(normal,tangentDirLight),0.0);
     //镜面光着色
-    vec3 reflectDir=reflect(-lightDir,normal);
+    vec3 reflectDir=reflect(-tangentDirLight,normal);
     float spec=pow(max(dot(viewDir,reflectDir),0.0),material.shininess);
     //计算阴影
     float shadow=ShadowCalculation(FragPosLightSpace, normal, lightDir);
@@ -157,21 +175,22 @@ vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir)
 }
 
 //点光源和阴影
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir,mat3 TBN)
 {
     vec3 lightDir = normalize(light.position - fragPos);
+    vec3 tangentDirLight=TBN*lightDir;
     // 漫反射着色
-    float diff = max(dot(normal, lightDir), 0.0);
+    float diff = max(dot(normal, tangentDirLight), 0.0);
     // 镜面光着色
     float spec=0.0;
     if(blinn)
     {
-        vec3 halfwayDir=normalize(lightDir+viewDir);
+        vec3 halfwayDir=normalize(tangentDirLight+viewDir);
         spec=pow(max(dot(normal,halfwayDir),0.0),material.shininess);
     }
     else
     {
-        vec3 reflectDir = reflect(-lightDir, normal);
+        vec3 reflectDir = reflect(-tangentDirLight, normal);
         spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
     }
     // 衰减

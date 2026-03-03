@@ -111,6 +111,7 @@ float skyboxVertices[] = {
 };
 
 
+
 int main()
 {
     glfwInit();
@@ -119,7 +120,8 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_STENCIL_BITS, 8);
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-
+    
+    
 
     GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
@@ -320,7 +322,9 @@ int main()
 
     //------------创建生成纹理对象---------
     unsigned int texture1 = LoadTexture2D("container2.png",true);
-    unsigned int specularMap = LoadTexture2D("container2_specular.png",false);
+    //todo 把这个贴图设置成他自己
+    unsigned int specularMap = LoadTexture2D("./normalmap/brickwall.jpg",false);
+    unsigned int normalMap=LoadTexture2D("normalmap/brickwall_normal.jpg",false);
 
     //skyboxvao,skyboxvbo
     unsigned int skyboxVAO,skyboxVBO;
@@ -401,6 +405,9 @@ int main()
 
         ourShader.setFloat("far_plane",far);
         ourShader.setInt("depthMap",3);
+
+        //设置法线贴图
+        ourShader.setInt("normalMap",4);
         
         //设置阴影
         ourShader.setInt("shadowMap",2);
@@ -444,7 +451,7 @@ int main()
                 glm::vec3 pos=glm::vec3(obj.model[3]);
                 std::string base = "pointLights[" + std::to_string(lightindex) + "].";
                 ourShader.setVec3(base + "position", pos);
-                ourShader.setVec3(base + "ambient", 0.05f, 0.05f, 0.05f);
+                ourShader.setVec3(base + "ambient", 0.25f, 0.25f, 0.25f);
                 ourShader.setVec3(base + "diffuse", 0.8f, 0.8f, 0.8f);
                 ourShader.setVec3(base + "specular", 1.0f, 1.0f, 1.0f);
                 ourShader.setFloat(base + "constant", 1.0f);
@@ -456,10 +463,10 @@ int main()
         }
         ourShader.setInt("numPointLights", lightindex);
 
-        // spotLight
+        // spotLight弃用
         ourShader.setVec3("spotLight.position", camera.Position);
         ourShader.setVec3("spotLight.direction", camera.Front);
-        ourShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+        ourShader.setVec3("spotLight.ambient", 1.0f, 1.0f, 1.0f);
         ourShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
         ourShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
         ourShader.setFloat("spotLight.constant", 1.0f);
@@ -557,14 +564,20 @@ int main()
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
 
+        //镜面光和漫反射贴图
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
-
+        
+        
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D,depthMap);
-
+        
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_CUBE_MAP,depthCubemap);
+        
+        //法线贴图
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D,normalMap);
 
         #pragma region skybox
         if(useSkybox)
