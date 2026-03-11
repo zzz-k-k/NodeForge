@@ -24,6 +24,21 @@ bool useSkybox=false;
 bool enableDirlight=true;
 bool useBlinnPhongShader=false;
 
+bool p_open=false;
+float fps;
+float frame_time;
+float delta_time;
+std::vector<float> frame_times;    // 历史帧时间记录
+std::vector<float> fps_history;    // 历史FPS记录
+size_t max_history_size = 300;
+
+size_t current_memory_usage = 0;
+size_t peak_memory_usage = 0;
+
+float gpu_time = 0.0f;
+size_t draw_calls = 0;
+size_t vertices_count = 0;
+size_t indices_count = 0;
 
 class UI
 {
@@ -38,6 +53,10 @@ class UI
         ImGuiIO& io = ImGui::GetIO(); 
         (void)io;
         io.FontGlobalScale = 1.5f; 
+
+        fps = io.Framerate;          // 当前帧率（FPS）
+        frame_time = 1000.0f / fps;  // 每帧耗时（毫秒）
+        delta_time = io.DeltaTime;
         
         ImGui::StyleColorsDark();
 
@@ -84,6 +103,37 @@ class UI
             {
                 ImGui::MenuItem("Shader Graph",nullptr,&showShaderGraphWindow);
                 ImGui::EndMenu();
+            }
+            if(ImGui::Begin("fps"))
+            {
+                ImGuiIO& io=ImGui::GetIO();
+                ImGui::Text("fps:%.1f",io.Framerate);
+                ImGui::Text("frame time:%.3f ms",1000.0f/io.Framerate);
+                ImGui::Text("delta time:%.6f s",io.DeltaTime);
+
+                ImGui::Separator();
+
+                //内存计算
+                frame_times.push_back(delta_time*1000.0f);
+                fps_history.push_back(1.0f/delta_time);
+                if(frame_times.size()>max_history_size){
+                    frame_times.erase(frame_times.begin());
+                    fps_history.erase(fps_history.begin());
+                }
+                peak_memory_usage=std::max(peak_memory_usage,current_memory_usage);
+                
+
+                ImGui::Text("memory usage:%.2f MB",current_memory_usage/(1024.0f*1024.0f));
+                ImGui::Text("peak memory:%.2f MB",peak_memory_usage/(1024.0f*1024.0f));
+                
+                ImGui::Separator();
+
+                ImGui::Text("draw calls:%zu",draw_calls);
+                ImGui::Text("Vertices: %zu",vertices_count);
+                ImGui::Text("Indices: %zu",indices_count);
+                ImGui::Text("GPU Time: %.3f ms",gpu_time);
+
+                ImGui::End();
             }
             ImGui::EndMainMenuBar();
         }
@@ -224,6 +274,7 @@ class UI
         ImGui::DestroyContext();
         shaderGraph.Shutdown();
     }
+
 
 };
 
