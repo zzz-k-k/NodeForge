@@ -50,7 +50,7 @@ class Model
                 cout<<"error::assimp::"<<import.GetErrorString()<<endl;
                 return;
             }
-            directory=path.substr(0,path.find_last_of('/'));
+            directory=path.substr(0,path.find_last_of('/\\'));
 
             processNode(scene->mRootNode,scene);
         }

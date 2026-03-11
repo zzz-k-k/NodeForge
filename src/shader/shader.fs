@@ -22,6 +22,8 @@ uniform bool blinn;
 
 uniform sampler2D shadowMap;
 
+uniform bool useNormalMap;
+
 //光源数组数量控制
 #define MAX_POINT_LIGHT 8
 uniform int numPointLights;
@@ -129,15 +131,24 @@ void main()
     float alpha = texColor.a;
 
     // 属性
-    //vec3 norm = normalize(Normal);
-    vec3 normal = texture(normalMap,TexCoord).rgb;
-    // 将法线向量转换为范围[-1,1]
-    vec3 norm = normalize(normal * 2.0 - 1.0);  
-    //处理tbn
-    vec3 tangentViewPos=TBN*viewPos;
-    vec3 tangentFragPos=TBN*FragPos;
-    
-    vec3 viewDir = normalize(tangentViewPos - tangentFragPos);
+    vec3 norm;
+    vec3 viewDir;
+    if(useNormalMap)
+    {
+        vec3 normal = texture(normalMap,TexCoord).rgb;
+        // 将法线向量转换为范围[-1,1]（切线空间）
+        norm = normalize(normal * 2.0 - 1.0);
+        // 切线空间下的观察方向
+        vec3 tangentViewPos = TBN * viewPos;
+        vec3 tangentFragPos = TBN * FragPos;
+        viewDir = normalize(tangentViewPos - tangentFragPos);
+    }
+    else
+    {
+        // 世界空间下的法线和观察方向
+        norm = normalize(Normal);
+        viewDir = normalize(viewPos - FragPos);
+    }
 
     // 第一阶段：定向光照
     //vec3 tangentDirLight=TBN*dirLight.direction;
@@ -159,11 +170,12 @@ void main()
 vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir,mat3 TBN)
 {
     vec3 lightDir=normalize(-light.direction);
-    vec3 tangentDirLight=TBN*lightDir;
+    // useNormalMap时变换到切线空间，否则保持世界空间
+    vec3 effectiveLightDir = useNormalMap ? TBN * lightDir : lightDir;
     //漫反射着色
-    float diff=max(dot(normal,tangentDirLight),0.0);
+    float diff=max(dot(normal,effectiveLightDir),0.0);
     //镜面光着色
-    vec3 reflectDir=reflect(-tangentDirLight,normal);
+    vec3 reflectDir=reflect(-effectiveLightDir,normal);
     float spec=pow(max(dot(viewDir,reflectDir),0.0),material.shininess);
     //计算阴影
     float shadow=ShadowCalculation(FragPosLightSpace, normal, lightDir);
@@ -178,19 +190,20 @@ vec3 CalcDirLight(DirLight light,vec3 normal,vec3 viewDir,mat3 TBN)
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir,mat3 TBN)
 {
     vec3 lightDir = normalize(light.position - fragPos);
-    vec3 tangentDirLight=TBN*lightDir;
+    // useNormalMap时变换到切线空间，否则保持世界空间
+    vec3 effectiveLightDir = useNormalMap ? TBN * lightDir : lightDir;
     // 漫反射着色
-    float diff = max(dot(normal, tangentDirLight), 0.0);
+    float diff = max(dot(normal, effectiveLightDir), 0.0);
     // 镜面光着色
     float spec=0.0;
     if(blinn)
     {
-        vec3 halfwayDir=normalize(tangentDirLight+viewDir);
+        vec3 halfwayDir=normalize(effectiveLightDir+viewDir);
         spec=pow(max(dot(normal,halfwayDir),0.0),material.shininess);
     }
     else
     {
-        vec3 reflectDir = reflect(-tangentDirLight, normal);
+        vec3 reflectDir = reflect(-effectiveLightDir, normal);
         spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
     }
     // 衰减

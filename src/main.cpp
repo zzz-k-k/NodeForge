@@ -26,7 +26,6 @@ void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::m
 void drawDepthObjects(Shader& depthShader);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
-unsigned int LoadTexture2D(const char* path,bool useSrgb=false);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -40,6 +39,7 @@ Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 UI ui;
 Grid grid;
 BuildSystem build;
+TextureCache TexCache;
 Raycaster raycaster;
 
 ImGuizmo::OPERATION gizmoOp=ImGuizmo::TRANSLATE;
@@ -139,11 +139,11 @@ int main()
     }
     stbi_set_flip_vertically_on_load(true);
 
-    Model ourModel("backpack/backpack.obj");
-
     //初始化默认图形
     build.cube.Init();
     build.quad.Init();
+
+    TexCache.Init();
 
     build.screenquad.Init();
 
@@ -321,10 +321,9 @@ int main()
     glfwSetDropCallback(window, drop_callback);
 
     //------------创建生成纹理对象---------
-    unsigned int texture1 = LoadTexture2D("container2.png",true);
-    //todo 把这个贴图设置成他自己
-    unsigned int specularMap = LoadTexture2D("./normalmap/brickwall.jpg",false);
-    unsigned int normalMap=LoadTexture2D("normalmap/brickwall_normal.jpg",false);
+    // unsigned int diffuseMap = LoadTexture2D("container2.png",true);
+    // unsigned int specularMap = LoadTexture2D("./normalmap/brickwall.jpg",false);
+    // unsigned int normalMap=LoadTexture2D("normalmap/brickwall_normal.jpg",false);
 
     //skyboxvao,skyboxvbo
     unsigned int skyboxVAO,skyboxVBO;
@@ -404,13 +403,13 @@ int main()
         ourShader.use();    
 
         ourShader.setFloat("far_plane",far);
-        ourShader.setInt("depthMap",3);
+        ourShader.setInt("depthMap",11);
 
         //设置法线贴图
-        ourShader.setInt("normalMap",4);
+        ourShader.setInt("normalMap",12);
         
         //设置阴影
-        ourShader.setInt("shadowMap",2);
+        ourShader.setInt("shadowMap",10);
         ourShader.setMat4("lightSpaceMatrix",lightSpaceMatrix);
         
         glm::mat4 view = camera.GetViewMatrix(); 
@@ -560,25 +559,13 @@ int main()
         glEnable(GL_DEPTH_TEST);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture1);
 
-        //镜面光和漫反射贴图
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, specularMap);
-        
-        
-        glActiveTexture(GL_TEXTURE2);
+        glActiveTexture(GL_TEXTURE10);
         glBindTexture(GL_TEXTURE_2D,depthMap);
         
-        glActiveTexture(GL_TEXTURE3);
+        glActiveTexture(GL_TEXTURE11);
         glBindTexture(GL_TEXTURE_CUBE_MAP,depthCubemap);
         
-        //法线贴图
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D,normalMap);
-
         #pragma region skybox
         if(useSkybox)
         {
@@ -638,9 +625,6 @@ int main()
         //绘制排序后的透明物体
         for(auto* obj:transparentObjects)
         {
-            if(obj->textureID==0&&!obj->texturePath.empty())
-                obj->textureID=LoadTexture2D(obj->texturePath.c_str(),true);
-
             glStencilMask(0x00);
             if(obj->selected)
             {
@@ -651,8 +635,16 @@ int main()
             ourShader.use();
             ourShader.setMat4("transform", obj->model);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, obj->textureID);
+            unsigned int texId = TexCache.Get(obj->material.diffuseTexPath, true);
+            glBindTexture(GL_TEXTURE_2D, texId != 0 ? texId : TexCache.GetDefault());
+            glActiveTexture(GL_TEXTURE1);
+            texId = TexCache.Get(obj->material.specularTexPath, false);
+            glBindTexture(GL_TEXTURE_2D, texId != 0 ? texId : TexCache.GetDefault());
+            glActiveTexture(GL_TEXTURE12);
+            texId = TexCache.Get(obj->material.normalTexPath, false);
+            glBindTexture(GL_TEXTURE_2D, texId != 0 ? texId : TexCache.GetDefaultNormal());
             ourShader.setInt("material.texture_diffuse1", 0);
+            ourShader.setBool("useNormalMap", true); 
             build.quad.Draw();
         }
         glDepthMask(GL_TRUE);
@@ -808,7 +800,6 @@ void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::m
             lampShader.use();
             lampShader.setMat4("view", view);
             lampShader.setMat4("projection", projection);
-
             lampShader.setMat4("model",obj.model);
             build.cube.Draw();
         }
@@ -816,6 +807,7 @@ void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::m
         {
             ourShader.use();
             ourShader.setMat4("transform",obj.model);
+            ourShader.setBool("useNormalMap", false);
             obj.modelAsset->Draw(ourShader);
         }
         
@@ -823,6 +815,16 @@ void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::m
         {
             ourShader.use();
             ourShader.setMat4("transform", obj.model);
+            ourShader.setBool("useNormalMap", !obj.material.normalTexPath.empty());
+            glActiveTexture(GL_TEXTURE0);
+            int id=TexCache.Get(obj.material.diffuseTexPath,true);
+            glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefault());
+            glActiveTexture(GL_TEXTURE1);
+            id=TexCache.Get(obj.material.specularTexPath,false);
+            glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefault());
+            glActiveTexture(GL_TEXTURE12);
+            id=TexCache.Get(obj.material.normalTexPath,false);
+            glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefaultNormal());
             build.cube.Draw();
         }
     }
@@ -927,49 +929,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
   camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
-//加载纹理对象
-//添加参数是否使用srgb
-unsigned int LoadTexture2D(const char* path,bool useSrgb)
-{
-    unsigned int tex;
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float borderColor[]={1.0,1.0,1.0,1.0};
-    glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,borderColor);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    int w, h, c;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load(path, &w, &h, &c, 0);
-    if (data)
-    {
-        if(useSrgb)
-        {
-            GLenum format = (c == 4) ? GL_RGBA : GL_RGB;
-            GLenum internalFormat=(c==4)?GL_SRGB_ALPHA:GL_SRGB;
-            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, GL_UNSIGNED_BYTE, data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        }
-        else
-        {
-            GLenum format = (c == 4) ? GL_RGBA : GL_RGB;
-            glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        }
-    }
-    else
-    {
-        std::cout << "Failed to load texture: " << path
-                  << " reason: " << stbi_failure_reason() << std::endl;
-    }
-    stbi_image_free(data);
-
-    return tex;
-}
 
 
 void drop_callback(GLFWwindow* window,int count, const char** paths)

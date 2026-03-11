@@ -10,18 +10,26 @@
 #include<string>
 #include"model.h"
 
+#include <unordered_map>
+
 enum class ObjType{Cube,Light,Model,Image};
+
+//材质结构体,0表示没有
+struct Material
+{
+    std::string diffuseTexPath;
+    std::string specularTexPath;
+    std::string normalTexPath;
+    float shininess=32.0f;
+};
 struct SceneObject
 {
     glm::mat4 model;
     int id=0;
     bool selected=false;
     ObjType type=ObjType::Cube;
-
     std::shared_ptr<Model> modelAsset;
-
-    std::string texturePath;
-    unsigned int textureID; 
+    Material material;
 
 };
 
@@ -112,16 +120,6 @@ public:
     unsigned int VAO,VBO,EBO;
     void Init()
     {
-        // float vertices[]=
-        // {
-        //     0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
-        //     0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
-        //     1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
-
-        //     0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
-        //     1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
-        //     1.0f,  0.5f,  0.0f,  1.0f,  0.0f
-        // };
 
         //手动计算切线和副切线
         #pragma region 手动计算切线和副切线
@@ -195,11 +193,6 @@ public:
         glBindVertexArray(VAO);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        // glEnableVertexAttribArray(0);
-        // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-        // glEnableVertexAttribArray(1);
-        // glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-        // glBindVertexArray(0);
         
         // 位置
         glEnableVertexAttribArray(0);
@@ -307,9 +300,131 @@ public:
         obj.model=glm::mat4(1.0f);
         obj.selected=false;
         obj.type=ObjType::Image;
-        obj.texturePath = imagePath;
-        obj.textureID = 0; 
+        obj.material.diffuseTexPath= imagePath;
+        obj.material.specularTexPath = "./normalmap/brickwall.jpg";
+        obj.material.normalTexPath = "normalmap/brickwall_normal.jpg";
         objects.push_back(obj);
+    }
+    void CreateCube()
+    {
+        SceneObject obj;
+        obj.id=nextId++;
+        obj.model=glm::mat4(1.0f);
+        obj.selected=false;
+        obj.type=ObjType::Cube;
+        obj.material.diffuseTexPath = "container2.png";
+        obj.material.specularTexPath = "container2_specular.png";
+        obj.material.normalTexPath = "";
+        obj.material.shininess = 32.0f;
+        objects.push_back(obj);
+    }
+    void CreateLight()
+    {
+        SceneObject obj;
+        obj.id=nextId++;
+        obj.model=glm::mat4(1.0f);
+        obj.selected=false;
+        obj.type=ObjType::Light;
+        objects.push_back(obj);
+    }
+};
+
+class TextureCache
+{
+private:
+    std::unordered_map<std::string,unsigned int>cache;
+    unsigned int defaultWhite=0;
+    unsigned int defaultNormal=0;
+
+public:
+    void Init()
+    {
+        glGenTextures(1,&defaultWhite);
+        glBindTexture(GL_TEXTURE_2D,defaultWhite);
+        unsigned char white[] = {255, 255, 255, 255};   // RGBA 白色
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+
+        glGenTextures(1, &defaultNormal);
+        glBindTexture(GL_TEXTURE_2D, defaultNormal);
+        unsigned char normal[] = {128, 128, 255};        // RGB 法线默认
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, normal);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+
+    }
+    unsigned int Get(const std::string& path,bool srgb=false)
+    {
+        if(path.empty())
+            return 0;
+
+        auto it=cache.find(path);
+        if(it !=cache.end())
+            return it->second;
+
+        unsigned int id=LoadTexture2D(path.c_str(),srgb);
+        cache[path]=id;
+        return id;
+    }
+    unsigned int GetDefault()
+    {
+        return defaultWhite;
+    }
+    unsigned int GetDefaultNormal()
+    {
+        return defaultNormal;
+    }
+    void Clear()
+    {
+        for(auto& pair:cache)
+        {
+            glDeleteTextures(1,&pair.second);
+        }
+        cache.clear();
+    }
+    //加载纹理对象
+    //添加参数是否使用srgb
+    unsigned int LoadTexture2D(const char* path,bool useSrgb)
+    {
+        unsigned int tex;
+        glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        float borderColor[]={1.0,1.0,1.0,1.0};
+        glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,borderColor);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        int w, h, c;
+        stbi_set_flip_vertically_on_load(true);
+        unsigned char* data = stbi_load(path, &w, &h, &c, 0);
+        if (data)
+        {
+            if(useSrgb)
+            {
+                GLenum format = (c == 4) ? GL_RGBA : GL_RGB;
+                GLenum internalFormat=(c==4)?GL_SRGB_ALPHA:GL_SRGB;
+                glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+                glGenerateMipmap(GL_TEXTURE_2D);
+            }
+            else
+            {
+                GLenum format = (c == 4) ? GL_RGBA : GL_RGB;
+                glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+                glGenerateMipmap(GL_TEXTURE_2D);
+            }
+        }
+        else
+        {
+            std::cout << "Failed to load texture: " << path
+                    << " reason: " << stbi_failure_reason() << std::endl;
+        }
+        stbi_image_free(data);
+
+        return tex;
     }
 };
 

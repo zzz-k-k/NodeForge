@@ -142,21 +142,11 @@ class UI
             ImGui::Begin("build",&showBuildWindow);
             if(ImGui::Button("cube"))
             {
-                SceneObject obj;
-                obj.id=build.nextId++;
-                obj.model=glm::mat4(1.0f);
-                obj.selected=false;
-                obj.type=ObjType::Cube;
-                build.objects.push_back(obj);
+                build.CreateCube();
             }
             if(ImGui::Button("light"))
             {
-                SceneObject obj;
-                obj.id=build.nextId++;
-                obj.model=glm::mat4(1.0f);
-                obj.selected=false;
-                obj.type=ObjType::Light;
-                build.objects.push_back(obj);
+                build.CreateLight();
             }
             if(ImGui::Button("image"))
             {
