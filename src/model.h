@@ -9,6 +9,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/config.h>
 
 #include <mesh.h>
 #include <shader.h>
@@ -43,14 +44,24 @@ class Model
         void loadModel(string path)
         {
             Assimp::Importer import;
-            const aiScene *scene=import.ReadFile(path,aiProcess_Triangulate|aiProcess_FlipUVs);
+            import.SetPropertyBool(AI_CONFIG_IMPORT_FBX_READ_WEIGHTS, false);
+            import.SetPropertyBool(AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, false);
+
+            const unsigned int importFlags =
+                aiProcess_Triangulate |
+                aiProcess_FlipUVs |
+                aiProcess_JoinIdenticalVertices |
+                aiProcess_GenSmoothNormals;
+
+            const aiScene *scene=import.ReadFile(path,importFlags);
 
             if(!scene||scene->mFlags&AI_SCENE_FLAGS_INCOMPLETE||!scene->mRootNode)
             {
                 cout<<"error::assimp::"<<import.GetErrorString()<<endl;
                 return;
             }
-            directory=path.substr(0,path.find_last_of('/\\'));
+            size_t separatorPos = path.find_last_of("/\\");
+            directory = (separatorPos == std::string::npos) ? "." : path.substr(0, separatorPos);
 
             processNode(scene->mRootNode,scene);
         }
@@ -59,7 +70,17 @@ class Model
             for(unsigned int i=0;i<node->mNumMeshes;i++)
             {
                 aiMesh *mesh=scene->mMeshes[node->mMeshes[i]];
-                meshes.push_back(processMesh(mesh,scene));
+                if(mesh == nullptr)
+                {
+                    std::cout << "warning::assimp::skip null mesh in node" << std::endl;
+                    continue;
+                }
+
+                Mesh processedMesh = processMesh(mesh,scene);
+                if(processedMesh.valid)
+                {
+                    meshes.push_back(std::move(processedMesh));
+                }
             }
             for(unsigned int i=0;i<node->mNumChildren;i++)
             {
@@ -71,6 +92,14 @@ class Model
             vector<Vertex> vertices;
             vector<unsigned int> indices;
             vector<Texture> textures;
+
+            if(mesh->mNumVertices == 0)
+            {
+                std::cout << "warning::assimp::skip mesh with zero vertices: "
+                          << mesh->mName.C_Str() << std::endl;
+                return Mesh(vertices,indices,textures);
+            }
+
             for(unsigned int i=0;i<mesh->mNumVertices;i++)
             {
                 Vertex vertex;
@@ -81,10 +110,17 @@ class Model
                 vector.z = mesh->mVertices[i].z; 
                 vertex.Position = vector;
 
-                vector.x = mesh->mNormals[i].x;
-                vector.y = mesh->mNormals[i].y;
-                vector.z = mesh->mNormals[i].z;
-                vertex.Normal = vector;
+                if(mesh->HasNormals())
+                {
+                    vector.x = mesh->mNormals[i].x;
+                    vector.y = mesh->mNormals[i].y;
+                    vector.z = mesh->mNormals[i].z;
+                    vertex.Normal = vector;
+                }
+                else
+                {
+                    vertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
+                }
 
                 if(mesh->mTextureCoords[0]) // 网格是否有纹理坐标？
                 {
@@ -106,15 +142,30 @@ class Model
                     indices.push_back(face.mIndices[j]);
             }
 
+            if(indices.empty())
+            {
+                std::cout << "warning::assimp::skip mesh with zero indices: "
+                          << mesh->mName.C_Str() << std::endl;
+                return Mesh(vertices,indices,textures);
+            }
+
             if(mesh->mMaterialIndex>=0)
             {
-                aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
-                vector<Texture> diffuseMaps = loadMaterialTextures(material, 
-                                                    aiTextureType_DIFFUSE, "texture_diffuse");
-                textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-                vector<Texture> specularMaps = loadMaterialTextures(material, 
-                                                    aiTextureType_SPECULAR, "texture_specular");
-                textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+                if(mesh->mMaterialIndex < scene->mNumMaterials && scene->mMaterials[mesh->mMaterialIndex] != nullptr)
+                {
+                    aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+                    vector<Texture> diffuseMaps = loadMaterialTextures(material, 
+                                                        aiTextureType_DIFFUSE, "texture_diffuse");
+                    textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+                    vector<Texture> specularMaps = loadMaterialTextures(material, 
+                                                        aiTextureType_SPECULAR, "texture_specular");
+                    textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+                }
+                else
+                {
+                    std::cout << "warning::assimp::skip invalid material index on mesh: "
+                              << mesh->mName.C_Str() << std::endl;
+                }
             }
             return Mesh(vertices,indices,textures);
         }

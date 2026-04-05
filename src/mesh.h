@@ -34,16 +34,23 @@ class Mesh
         vector<Vertex> vertices;
         vector<unsigned int> indices;
         vector<Texture> textures;
+        unsigned int indexCount = 0;
+        bool valid = false;
         Mesh(vector<Vertex> vertices,vector<unsigned int> indices,vector<Texture> textures)
         {
             this->vertices=vertices;
             this->indices=indices;
             this->textures=textures;
+            this->indexCount = static_cast<unsigned int>(this->indices.size());
 
             setupMesh();
         }
         void Draw(Shader &shader)
         {
+            //假如具有空节点，直接return
+            if(!valid || VAO == 0 || indexCount == 0)
+                return;
+
             unsigned int diffuseNr=1;
             unsigned int specularNr=1;
             for(unsigned int i=0;i<textures.size();i++)
@@ -62,13 +69,19 @@ class Mesh
             glActiveTexture(GL_TEXTURE0);
 
             glBindVertexArray(VAO);
-            glDrawElements(GL_TRIANGLES,indices.size(),GL_UNSIGNED_INT,0);
+            glDrawElements(GL_TRIANGLES,indexCount,GL_UNSIGNED_INT,0);
             glBindVertexArray(0);
         }
     private:
-        unsigned int VAO,VBO,EBO;
+        unsigned int VAO = 0, VBO = 0, EBO = 0;
         void setupMesh()
         {
+            if(vertices.empty() || indices.empty())
+            {
+                valid = false;
+                return;
+            }
+
             glGenVertexArrays(1,&VAO);
             glGenBuffers(1,&VBO);
             glGenBuffers(1,&EBO);
@@ -76,10 +89,10 @@ class Mesh
             glBindVertexArray(VAO);
             glBindBuffer(GL_ARRAY_BUFFER,VBO);
 
-            glBufferData(GL_ARRAY_BUFFER,vertices.size()*sizeof(Vertex),&vertices[0],GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER,vertices.size()*sizeof(Vertex),vertices.data(),GL_STATIC_DRAW);
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,EBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,indices.size()*sizeof(unsigned int),&indices[0],GL_STATIC_DRAW);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER,indices.size()*sizeof(unsigned int),indices.data(),GL_STATIC_DRAW);
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),(void*)0);
             glEnableVertexAttribArray(1);
@@ -88,6 +101,7 @@ class Mesh
             glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),(void*)offsetof(Vertex,TexCoords));
 
             glBindVertexArray(0);
+            valid = true;
         }
 };
 
