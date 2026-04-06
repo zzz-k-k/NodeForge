@@ -10,6 +10,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/config.h>
+#include <assimp/material.h>
 
 #include <mesh.h>
 #include <shader.h>
@@ -18,11 +19,16 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <filesystem>
 #include <map>
 #include <vector>
 using namespace std;
+namespace fs = std::filesystem;
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
+unsigned int CreateSolidColorTexture(const glm::vec4& color, bool gamma = false);
+std::string FindTextureByMaterialName(const std::string& materialName, const std::string& directory, const std::vector<std::string>& suffixes);
+std::vector<unsigned char> ReadBinaryFileBytes(const std::string& path);
 vector<Texture> textures_loaded;
 
 class Model
@@ -154,8 +160,46 @@ class Model
                 if(mesh->mMaterialIndex < scene->mNumMaterials && scene->mMaterials[mesh->mMaterialIndex] != nullptr)
                 {
                     aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+                    aiString materialName;
+                    material->Get(AI_MATKEY_NAME, materialName);
+
+                    aiColor4D baseColor(1.0f, 1.0f, 1.0f, 1.0f);
+                    const bool hasBaseColorFactor =
+                        material->Get(AI_MATKEY_BASE_COLOR, baseColor) == aiReturn_SUCCESS ||
+                        material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == aiReturn_SUCCESS;
+
                     vector<Texture> diffuseMaps = loadMaterialTextures(material, 
-                                                        aiTextureType_DIFFUSE, "texture_diffuse", true);
+                                                        aiTextureType_BASE_COLOR, "texture_diffuse", true);
+                    if(diffuseMaps.empty())
+                    {
+                        diffuseMaps = loadMaterialTextures(material,
+                                                            aiTextureType_DIFFUSE, "texture_diffuse", true);
+                    }
+                    if(diffuseMaps.empty())
+                    {
+                        const std::string fallbackDiffusePath = FindTextureByMaterialName(
+                            materialName.C_Str(), directory, {"_D", "_BaseColor", "_BC"});
+                        if(!fallbackDiffusePath.empty())
+                        {
+                            Texture fallbackDiffuse;
+                            fallbackDiffuse.id = TextureFromFile(fallbackDiffusePath.c_str(), directory, true);
+                            fallbackDiffuse.type = "texture_diffuse";
+                            fallbackDiffuse.path = fallbackDiffusePath;
+                            diffuseMaps.push_back(fallbackDiffuse);
+                        }
+                    }
+                    if(diffuseMaps.empty())
+                    {
+                        if(hasBaseColorFactor)
+                        {
+                            Texture solidDiffuse;
+                            solidDiffuse.id = CreateSolidColorTexture(
+                                glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a), true);
+                            solidDiffuse.type = "texture_diffuse";
+                            solidDiffuse.path = "__solid_diffuse__" + std::string(mesh->mName.C_Str());
+                            diffuseMaps.push_back(solidDiffuse);
+                        }
+                    }
                     textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
                     vector<Texture> specularMaps = loadMaterialTextures(material, 
                                                         aiTextureType_SPECULAR, "texture_specular", false);
@@ -175,11 +219,21 @@ class Model
             for(unsigned int i = 0; i < mat->GetTextureCount(type); i++)
             {
                 aiString str;
-                mat->GetTexture(type, i, &str);
+                if(mat->GetTexture(type, i, &str) != aiReturn_SUCCESS)
+                {
+                    continue;
+                }
+
+                const char* texturePath = str.C_Str();
+                if(texturePath == nullptr || texturePath[0] == '\0')
+                {
+                    continue;
+                }
+
                 bool skip = false;
                 for(unsigned int j = 0; j < textures_loaded.size(); j++)
                 {
-                    if(std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0)
+                    if(textures_loaded[j].path == texturePath)
                     {
                         textures.push_back(textures_loaded[j]);
                         skip = true; 
@@ -188,8 +242,8 @@ class Model
                 }
                 if(!skip)
                 {   // 如果纹理还没有被加载，则加载它
-                    textures.push_back({TextureFromFile(str.C_Str(), directory, gamma), typeName, str.C_Str()});
-                    textures_loaded.push_back(textures.back()); // 添加到已加载的纹理中
+                    textures.push_back({TextureFromFile(texturePath, directory, gamma), typeName, texturePath});
+                    textures_loaded.push_back({TextureFromFile(texturePath, directory, gamma), typeName, texturePath}); // 添加到已加载的纹理中
                 }
             }
             return textures;
@@ -200,14 +254,70 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
 {
     stbi_set_flip_vertically_on_load(true);
 
-    string filename = string(path);
-    filename = directory + '/' + filename;
+    auto fileExists = [](const fs::path& candidate) -> bool
+    {
+        std::error_code errorCode;
+        return fs::exists(candidate, errorCode) && fs::is_regular_file(candidate, errorCode);
+    };
+
+    auto resolveTexturePath = [&](const char* texturePath) -> std::string
+    {
+        fs::path rawPath(texturePath);
+        if(rawPath.is_absolute() && fileExists(rawPath))
+            return rawPath.string();
+
+        fs::path modelDirectory(directory);
+        std::vector<fs::path> candidates;
+        candidates.push_back(modelDirectory / rawPath);
+        candidates.push_back(modelDirectory / rawPath.filename());
+
+        const fs::path modelParent = modelDirectory.parent_path();
+        if(!modelParent.empty())
+        {
+            candidates.push_back(modelParent / rawPath);
+            candidates.push_back(modelParent / rawPath.filename());
+            candidates.push_back(modelParent / "Textures" / rawPath);
+            candidates.push_back(modelParent / "Textures" / rawPath.filename());
+        }
+
+        for(const auto& candidate : candidates)
+        {
+            if(fileExists(candidate))
+                return candidate.string();
+        }
+
+        const fs::path searchRoot = modelParent.empty() ? modelDirectory : modelParent;
+        std::error_code errorCode;
+        for(const auto& entry : fs::recursive_directory_iterator(searchRoot, fs::directory_options::skip_permission_denied, errorCode))
+        {
+            if(errorCode)
+                break;
+            if(!entry.is_regular_file())
+                continue;
+            if(entry.path().filename() == rawPath.filename())
+                return entry.path().string();
+        }
+
+        return (modelDirectory / rawPath.filename()).string();
+    };
+
+    string filename = resolveTexturePath(path);
 
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
-    unsigned char *data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+    const std::vector<unsigned char> fileBytes = ReadBinaryFileBytes(filename);
+    unsigned char *data = nullptr;
+    if(!fileBytes.empty())
+    {
+        data = stbi_load_from_memory(fileBytes.data(),
+                                     static_cast<int>(fileBytes.size()),
+                                     &width,
+                                     &height,
+                                     &nrComponents,
+                                     0);
+    }
     if (data)
     {
         GLenum format;
@@ -246,11 +356,94 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
     }
     else
     {
-        std::cout << "Texture failed to load at path: " << path << std::endl;
+        std::cout << "Texture failed to load at resolved path: " << filename
+                  << " source: " << path << std::endl;
         stbi_image_free(data);
     }
 
     return textureID;
+}
+
+unsigned int CreateSolidColorTexture(const glm::vec4& color, bool gamma)
+{
+    unsigned int textureID = 0;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    auto toByte = [](float value) -> unsigned char
+    {
+        const float clamped = glm::clamp(value, 0.0f, 1.0f);
+        return static_cast<unsigned char>(clamped * 255.0f + 0.5f);
+    };
+
+    unsigned char pixel[] = {
+        toByte(color.r),
+        toByte(color.g),
+        toByte(color.b),
+        toByte(color.a)
+    };
+
+    const GLenum internalFormat = gamma ? GL_SRGB_ALPHA : GL_RGBA;
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    return textureID;
+}
+
+std::string FindTextureByMaterialName(const std::string& materialName, const std::string& directory, const std::vector<std::string>& suffixes)
+{
+    if(materialName.empty())
+        return "";
+
+    fs::path modelDirectory(directory);
+    fs::path searchRoot = modelDirectory.parent_path();
+    if(searchRoot.empty())
+        searchRoot = modelDirectory;
+
+    std::string textureStem = materialName;
+    if(textureStem.rfind("MI_", 0) == 0)
+        textureStem.replace(0, 3, "T_");
+    else if(textureStem.rfind("M_", 0) == 0)
+        textureStem.replace(0, 2, "T_");
+
+    const std::vector<std::string> extensions = {".png", ".tga", ".jpg", ".jpeg", ".dds"};
+    for(const auto& suffix : suffixes)
+    {
+        for(const auto& extension : extensions)
+        {
+            fs::path candidate = searchRoot / "Textures" / (textureStem + suffix + extension);
+            std::error_code errorCode;
+            if(fs::exists(candidate, errorCode) && fs::is_regular_file(candidate, errorCode))
+                return candidate.string();
+        }
+    }
+
+    return "";
+}
+
+std::vector<unsigned char> ReadBinaryFileBytes(const std::string& path)
+{
+    std::ifstream file(fs::path(path), std::ios::binary);
+    if(!file)
+        return {};
+
+    file.seekg(0, std::ios::end);
+    const std::streampos endPos = file.tellg();
+    if(endPos <= 0)
+    {
+        return {};
+    }
+
+    std::vector<unsigned char> buffer(static_cast<size_t>(endPos));
+    file.seekg(0, std::ios::beg);
+    file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+    if(!file)
+        return {};
+
+    return buffer;
 }
 
 #endif

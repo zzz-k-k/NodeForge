@@ -759,6 +759,7 @@ void ApplySurfaceMaterialUniforms(Shader& shader,const SceneObject& obj,bool ena
     shader.setInt("material.texture_specular1", 1);
     shader.setInt("normalMap", 12);
     shader.setBool("useNormalMap", enableNormalMap);
+    shader.setBool("useTextureAlpha", obj.type == ObjType::Image);
 
     BindObjectMaterialTextures(obj);
 }

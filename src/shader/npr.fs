@@ -6,6 +6,7 @@ in vec3 Normal;
 in vec3 FragPos;
 
 uniform vec3 viewPos;
+uniform bool useTextureAlpha;
 
 #define MAX_POINT_LIGHT 8
 uniform int numPointLights;
@@ -132,5 +133,6 @@ void main()
 
     color += EvaluateRimLight(normal, viewDir);
     color = clamp(color, 0.0, 1.0);
-    FragColor = vec4(color, texColor.a);
+    float alpha = useTextureAlpha ? texColor.a : 1.0;
+    FragColor = vec4(color, alpha);
 }

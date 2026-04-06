@@ -480,7 +480,17 @@ public:
 
         int w, h, c;
         stbi_set_flip_vertically_on_load(true);
-        unsigned char* data = stbi_load(path, &w, &h, &c, 0);
+        const std::vector<unsigned char> fileBytes = ReadBinaryFileBytes(path);
+        unsigned char* data = nullptr;
+        if(!fileBytes.empty())
+        {
+            data = stbi_load_from_memory(fileBytes.data(),
+                                         static_cast<int>(fileBytes.size()),
+                                         &w,
+                                         &h,
+                                         &c,
+                                         0);
+        }
         if (data)
         {
             if(useSrgb)

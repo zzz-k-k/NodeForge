@@ -19,6 +19,7 @@ uniform float far_plane;
 uniform vec3 viewPos;
 
 uniform bool blinn;
+uniform bool useTextureAlpha;
 
 uniform sampler2D shadowMap;
 
@@ -128,7 +129,7 @@ void main()
 {
     //获取alpha
     vec4 texColor = texture(material.texture_diffuse1, TexCoord);
-    float alpha = texColor.a;
+    float alpha = useTextureAlpha ? texColor.a : 1.0;
 
     // 属性
     vec3 norm;
