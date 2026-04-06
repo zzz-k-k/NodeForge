@@ -13,13 +13,44 @@
 #include <unordered_map>
 
 enum class ObjType{Cube,Light,Model,Image};
+enum class RenderMode{Phong,PBR,NPR};
+
+inline const char* GetObjTypeLabel(ObjType type)
+{
+    switch(type)
+    {
+        case ObjType::Cube: return "Cube";
+        case ObjType::Light: return "Light";
+        case ObjType::Model: return "Model";
+        case ObjType::Image: return "Image";
+        default: return "Object";
+    }
+}
+
+inline const char* GetRenderModeLabel(RenderMode mode)
+{
+    switch(mode)
+    {
+        case RenderMode::Phong: return "Phong";
+        case RenderMode::PBR: return "PBR";
+        case RenderMode::NPR: return "NPR";
+        default: return "Phong";
+    }
+}
 
 //材质结构体,0表示没有
 struct Material
 {
+    RenderMode renderMode=RenderMode::Phong;
     std::string diffuseTexPath;
     std::string specularTexPath;
     std::string normalTexPath;
+    glm::vec3 albedo=glm::vec3(1.0f,1.0f,1.0f);
+    float metallic=0.0f;
+    float roughness=0.5f;
+    float ao=1.0f;
+    float toonLevels=4.0f;
+    float outlineWidth=0.05f;
     float shininess=32.0f;
 };
 struct SceneObject
@@ -291,6 +322,13 @@ public:
         obj.selected=false;
         obj.type=ObjType::Model;
         obj.modelAsset=std::make_shared<Model>(path.c_str());
+        obj.material.renderMode=RenderMode::Phong;
+        obj.material.albedo=glm::vec3(1.0f,1.0f,1.0f);
+        obj.material.metallic=0.0f;
+        obj.material.roughness=0.5f;
+        obj.material.ao=1.0f;
+        obj.material.toonLevels=4.0f;
+        obj.material.outlineWidth=0.05f;
         objects.push_back(obj);
     }
     void CreateImage(const char* imagePath)
@@ -300,9 +338,16 @@ public:
         obj.model=glm::mat4(1.0f);
         obj.selected=false;
         obj.type=ObjType::Image;
+        obj.material.renderMode=RenderMode::Phong;
         obj.material.diffuseTexPath= imagePath;
         obj.material.specularTexPath = "./normalmap/brickwall.jpg";
         obj.material.normalTexPath = "normalmap/brickwall_normal.jpg";
+        obj.material.albedo=glm::vec3(1.0f,1.0f,1.0f);
+        obj.material.metallic=0.0f;
+        obj.material.roughness=0.9f;
+        obj.material.ao=1.0f;
+        obj.material.toonLevels=4.0f;
+        obj.material.outlineWidth=0.05f;
         objects.push_back(obj);
     }
     void CreateCube()
@@ -312,9 +357,16 @@ public:
         obj.model=glm::mat4(1.0f);
         obj.selected=false;
         obj.type=ObjType::Cube;
+        obj.material.renderMode = RenderMode::Phong;
         obj.material.diffuseTexPath = "container2.png";
         obj.material.specularTexPath = "container2_specular.png";
         obj.material.normalTexPath = "";
+        obj.material.albedo = glm::vec3(1.0f, 0.766f, 0.336f);
+        obj.material.metallic = 0.0f;
+        obj.material.roughness = 0.35f;
+        obj.material.ao = 1.0f;
+        obj.material.toonLevels = 4.0f;
+        obj.material.outlineWidth = 0.05f;
         obj.material.shininess = 32.0f;
         objects.push_back(obj);
     }

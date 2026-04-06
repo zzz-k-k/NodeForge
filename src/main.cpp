@@ -22,7 +22,13 @@
 #include<algorithm>
 #include<vector>
 
-void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::mat4 projection);
+void BindDefaultSurfaceTextures();
+void BindObjectMaterialTextures(const SceneObject& obj);
+void ApplySurfaceMaterialUniforms(Shader& shader,const SceneObject& obj,bool enableNormalMap);
+void ApplyCommonSurfaceUniforms(Shader& shader,const glm::mat4& view,const glm::mat4& projection,const glm::mat4& lightSpaceMatrix,const glm::vec3& shadowCasterPos);
+Shader& SelectSurfaceShader(const SceneObject& obj,Shader& phongShader,Shader& pbrShader,Shader& nprShader);
+void DrawSceneObjectGeometry(Shader& shader,SceneObject& obj);
+void drawOpaqueObject(Shader& lampShader,Shader& phongShader,Shader& pbrShader,Shader& nprShader,const glm::mat4& view,const glm::mat4& projection);
 void drawDepthObjects(Shader& depthShader);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -278,6 +284,8 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     Shader ourShader("../../src/shader/shader.vs", "../../src/shader/shader.fs");
+    Shader pbrShader("../../src/shader/shader.vs", "../../src/shader/pbr.fs");
+    Shader nprShader("../../src/shader/shader.vs", "../../src/shader/npr.fs");
     Shader lampShader("../../src/shader/lightShader.vs","../../src/shader/lightShader.fs");
     Shader gridShader("../../src/gridshader/grid.vs",
                   "../../src/gridshader/grid.fs");
@@ -399,80 +407,10 @@ int main()
             processInput(window);
         }
 
-
-        ourShader.use();    
-
-        ourShader.setFloat("far_plane",far);
-        ourShader.setInt("depthMap",11);
-
-        //设置法线贴图
-        ourShader.setInt("normalMap",12);
-        
-        //设置阴影
-        ourShader.setInt("shadowMap",10);
-        ourShader.setMat4("lightSpaceMatrix",lightSpaceMatrix);
-        
         glm::mat4 view = camera.GetViewMatrix(); 
-        ourShader.setMat4("view",view);
-        
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)width / (float)height, 0.1f, 100.0f);
-        ourShader.setMat4("projection", projection);
-        
-        ourShader.setVec3("viewPos",camera.Position);
-        
-        //材质的反光度
-        ourShader.setFloat("material.shininess",1.0f);
-        
-        //材质
-        ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-        if(enableDirlight)
-        {
-            ourShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
-            ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-            ourShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-        }
-        else
-        {
-            ourShader.setVec3("dirLight.ambient", 0.0f, 0.0f, 0.0f);
-            ourShader.setVec3("dirLight.diffuse", 0.0f, 0.0f, 0.0f);
-            ourShader.setVec3("dirLight.specular", 0.0f, 0.0f, 0.0f);
-        }
-        ourShader.setBool("blinn",useBlinnPhongShader);
-        //pointlight
-        int lightindex=0;
-        const int maxLights=8;
-        for(auto& obj:build.objects)
-        {
-            if(obj.type==ObjType::Light&&lightindex<maxLights)
-            {
-                glm::vec3 pos=glm::vec3(obj.model[3]);
-                std::string base = "pointLights[" + std::to_string(lightindex) + "].";
-                ourShader.setVec3(base + "position", pos);
-                ourShader.setVec3(base + "ambient", 0.25f, 0.25f, 0.25f);
-                ourShader.setVec3(base + "diffuse", 0.8f, 0.8f, 0.8f);
-                ourShader.setVec3(base + "specular", 1.0f, 1.0f, 1.0f);
-                ourShader.setFloat(base + "constant", 1.0f);
-                ourShader.setFloat(base + "linear", 0.09f);
-                ourShader.setFloat(base + "quadratic", 0.032f);
-    
-                lightindex++;
-            }
-        }
-        ourShader.setInt("numPointLights", lightindex);
-
-        // spotLight弃用
-        ourShader.setVec3("spotLight.position", camera.Position);
-        ourShader.setVec3("spotLight.direction", camera.Front);
-        ourShader.setVec3("spotLight.ambient", 1.0f, 1.0f, 1.0f);
-        ourShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-        ourShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("spotLight.constant", 1.0f);
-        ourShader.setFloat("spotLight.linear", 0.09f);
-        ourShader.setFloat("spotLight.quadratic", 0.032f);
-        ourShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-        ourShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));   
 
         //灯的模型
         glm::mat4 model=glm::mat4();
@@ -546,6 +484,10 @@ int main()
         glViewport(0, 0, width, height);
 
         #pragma endregion
+
+        ApplyCommonSurfaceUniforms(ourShader,view,projection,lightSpaceMatrix,shadowCasterPos);
+        ApplyCommonSurfaceUniforms(pbrShader,view,projection,lightSpaceMatrix,shadowCasterPos);
+        ApplyCommonSurfaceUniforms(nprShader,view,projection,lightSpaceMatrix,shadowCasterPos);
         
         // 用 UI 控制渲染状态/参数（示例）
         glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
@@ -587,17 +529,11 @@ int main()
 
         #pragma endregion
         
-        ourShader.use();
-
-        ourShader.setInt("material.texture_diffuse1", 0);
-        ourShader.setInt("material.texture_specular1", 1);
-
-
         //绘制场景物体
         #pragma region sceneobjects
 
         // 第一遍：绘制所有不透明物体
-        drawOpaqueObject(lampShader,ourShader,view,projection);
+        drawOpaqueObject(lampShader,ourShader,pbrShader,nprShader,view,projection);
         //绘制透明物体
         //收集透明物体
         std::vector<SceneObject*> transparentObjects;
@@ -632,20 +568,10 @@ int main()
                 glStencilMask(0xFF);
             }
             //绘制
-            ourShader.use();
-            ourShader.setMat4("transform", obj->model);
-            glActiveTexture(GL_TEXTURE0);
-            unsigned int texId = TexCache.Get(obj->material.diffuseTexPath, true);
-            glBindTexture(GL_TEXTURE_2D, texId != 0 ? texId : TexCache.GetDefault());
-            glActiveTexture(GL_TEXTURE1);
-            texId = TexCache.Get(obj->material.specularTexPath, false);
-            glBindTexture(GL_TEXTURE_2D, texId != 0 ? texId : TexCache.GetDefault());
-            glActiveTexture(GL_TEXTURE12);
-            texId = TexCache.Get(obj->material.normalTexPath, false);
-            glBindTexture(GL_TEXTURE_2D, texId != 0 ? texId : TexCache.GetDefaultNormal());
-            ourShader.setInt("material.texture_diffuse1", 0);
-            ourShader.setBool("useNormalMap", true); 
-            build.quad.Draw();
+            Shader& surfaceShader = SelectSurfaceShader(*obj,ourShader,pbrShader,nprShader);
+            surfaceShader.use();
+            ApplySurfaceMaterialUniforms(surfaceShader,*obj,obj->material.renderMode==RenderMode::Phong);
+            DrawSceneObjectGeometry(surfaceShader,*obj);
         }
         glDepthMask(GL_TRUE);
         glEnable(GL_CULL_FACE);
@@ -665,8 +591,9 @@ int main()
                 lampShader.setMat4("view",view);
                 lampShader.setMat4("projection",projection);
                 
+                const float outlineScale = 1.0f + std::max(obj.material.outlineWidth, 0.0f);
                 glm::mat4 outlineModel=obj.model;
-                outlineModel=glm::scale(outlineModel,glm::vec3(1.05f));
+                outlineModel=glm::scale(outlineModel,glm::vec3(outlineScale));
                 lampShader.setMat4("model",outlineModel);
                 
                 if(obj.type==ObjType::Model&&obj.modelAsset)
@@ -778,7 +705,143 @@ void drawDepthObjects(Shader& depthShader)
     }
 }
 
-void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::mat4 projection)
+void BindDefaultSurfaceTextures()
+{
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, TexCache.GetDefault());
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, TexCache.GetDefault());
+    glActiveTexture(GL_TEXTURE12);
+    glBindTexture(GL_TEXTURE_2D, TexCache.GetDefaultNormal());
+}
+
+void BindObjectMaterialTextures(const SceneObject& obj)
+{
+    BindDefaultSurfaceTextures();
+
+    glActiveTexture(GL_TEXTURE0);
+    unsigned int id = TexCache.Get(obj.material.diffuseTexPath, true);
+    glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefault());
+
+    glActiveTexture(GL_TEXTURE1);
+    id = TexCache.Get(obj.material.specularTexPath, false);
+    glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefault());
+
+    glActiveTexture(GL_TEXTURE12);
+    id = TexCache.Get(obj.material.normalTexPath, false);
+    glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefaultNormal());
+}
+
+void ApplySurfaceMaterialUniforms(Shader& shader,const SceneObject& obj,bool enableNormalMap)
+{
+    shader.setMat4("transform", obj.model);
+    shader.setVec3("material.albedo", obj.material.albedo);
+    shader.setFloat("material.metallic", obj.material.metallic);
+    shader.setFloat("material.roughness", obj.material.roughness);
+    shader.setFloat("material.ao", obj.material.ao);
+    shader.setFloat("material.toonLevels", obj.material.toonLevels);
+    shader.setFloat("material.outlineWidth", obj.material.outlineWidth);
+    shader.setFloat("material.shininess", obj.material.shininess);
+    shader.setInt("material.texture_diffuse1", 0);
+    shader.setInt("material.texture_specular1", 1);
+    shader.setInt("normalMap", 12);
+    shader.setBool("useNormalMap", enableNormalMap);
+
+    BindObjectMaterialTextures(obj);
+}
+
+void ApplyCommonSurfaceUniforms(Shader& shader,const glm::mat4& view,const glm::mat4& projection,const glm::mat4& lightSpaceMatrix,const glm::vec3& shadowCasterPos)
+{
+    shader.use();
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
+    shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    shader.setVec3("viewPos", camera.Position);
+    shader.setFloat("far_plane", 25.0f);
+    shader.setInt("shadowMap", 10);
+    shader.setInt("depthMap", 11);
+    shader.setBool("blinn", useBlinnPhongShader);
+
+    shader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
+    if(enableDirlight)
+    {
+        shader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
+        shader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+        shader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+    }
+    else
+    {
+        shader.setVec3("dirLight.ambient", 0.0f, 0.0f, 0.0f);
+        shader.setVec3("dirLight.diffuse", 0.0f, 0.0f, 0.0f);
+        shader.setVec3("dirLight.specular", 0.0f, 0.0f, 0.0f);
+    }
+
+    int lightIndex = 0;
+    const int maxLights = 8;
+    for(const auto& obj : build.objects)
+    {
+        if(obj.type == ObjType::Light && lightIndex < maxLights)
+        {
+            glm::vec3 pos = glm::vec3(obj.model[3]);
+            std::string base = "pointLights[" + std::to_string(lightIndex) + "].";
+            shader.setVec3(base + "position", pos);
+            shader.setVec3(base + "ambient", 0.25f, 0.25f, 0.25f);
+            shader.setVec3(base + "diffuse", 0.8f, 0.8f, 0.8f);
+            shader.setVec3(base + "specular", 1.0f, 1.0f, 1.0f);
+            shader.setFloat(base + "constant", 1.0f);
+            shader.setFloat(base + "linear", 0.09f);
+            shader.setFloat(base + "quadratic", 0.032f);
+            lightIndex++;
+        }
+    }
+    shader.setInt("numPointLights", lightIndex);
+
+    shader.setVec3("spotLight.position", camera.Position);
+    shader.setVec3("spotLight.direction", camera.Front);
+    shader.setVec3("spotLight.ambient", 1.0f, 1.0f, 1.0f);
+    shader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
+    shader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("spotLight.constant", 1.0f);
+    shader.setFloat("spotLight.linear", 0.09f);
+    shader.setFloat("spotLight.quadratic", 0.032f);
+    shader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+    shader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
+    shader.setVec3("shadowCasterPos", shadowCasterPos);
+}
+
+Shader& SelectSurfaceShader(const SceneObject& obj,Shader& phongShader,Shader& pbrShader,Shader& nprShader)
+{
+    switch(obj.material.renderMode)
+    {
+        case RenderMode::PBR:
+            return pbrShader;
+        case RenderMode::NPR:
+            return nprShader;
+        case RenderMode::Phong:
+        default:
+            return phongShader;
+    }
+}
+
+void DrawSceneObjectGeometry(Shader& shader,SceneObject& obj)
+{
+    shader.setMat4("transform", obj.model);
+
+    if(obj.type == ObjType::Model && obj.modelAsset)
+    {
+        obj.modelAsset->Draw(shader);
+    }
+    else if(obj.type == ObjType::Image)
+    {
+        build.quad.Draw();
+    }
+    else
+    {
+        build.cube.Draw();
+    }
+}
+
+void drawOpaqueObject(Shader& lampShader,Shader& phongShader,Shader& pbrShader,Shader& nprShader,const glm::mat4& view,const glm::mat4& projection)
 {
     for (auto& obj : build.objects)
     {
@@ -805,27 +868,19 @@ void drawOpaqueObject(Shader& lampShader,Shader& ourShader,glm::mat4 view,glm::m
         }
         else if(obj.type==ObjType::Model&&obj.modelAsset)
         {
-            ourShader.use();
-            ourShader.setMat4("transform",obj.model);
-            ourShader.setBool("useNormalMap", false);
-            obj.modelAsset->Draw(ourShader);
+            Shader& surfaceShader = SelectSurfaceShader(obj,phongShader,pbrShader,nprShader);
+            surfaceShader.use();
+            ApplySurfaceMaterialUniforms(surfaceShader,obj,false);
+            DrawSceneObjectGeometry(surfaceShader,obj);
         }
         
         else //cube
         {
-            ourShader.use();
-            ourShader.setMat4("transform", obj.model);
-            ourShader.setBool("useNormalMap", !obj.material.normalTexPath.empty());
-            glActiveTexture(GL_TEXTURE0);
-            int id=TexCache.Get(obj.material.diffuseTexPath,true);
-            glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefault());
-            glActiveTexture(GL_TEXTURE1);
-            id=TexCache.Get(obj.material.specularTexPath,false);
-            glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefault());
-            glActiveTexture(GL_TEXTURE12);
-            id=TexCache.Get(obj.material.normalTexPath,false);
-            glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefaultNormal());
-            build.cube.Draw();
+            Shader& surfaceShader = SelectSurfaceShader(obj,phongShader,pbrShader,nprShader);
+            surfaceShader.use();
+            const bool enableNormalMap = obj.material.renderMode == RenderMode::Phong && !obj.material.normalTexPath.empty();
+            ApplySurfaceMaterialUniforms(surfaceShader,obj,enableNormalMap);
+            DrawSceneObjectGeometry(surfaceShader,obj);
         }
     }
 }

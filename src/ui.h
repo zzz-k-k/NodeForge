@@ -180,7 +180,7 @@ class UI
         
         for(auto& obj:build.objects)
         {
-            std::string name = (obj.type == ObjType::Light) ? "Light" : "Cube";
+            std::string name = GetObjTypeLabel(obj.type);
             std::string label = name + "##" + std::to_string(obj.id);
             bool isSelected=(obj.id==build.selectedId);
 
@@ -211,7 +211,7 @@ class UI
         
         if(build.selectedId!=-1)
         {
-            ImVec2 size(300,200);
+            ImVec2 size(300,360);
             ImVec2 pos(io.DisplaySize.x-size.x-10,320);
             ImGui::SetNextWindowPos(pos,ImGuiCond_Always);
             ImGui::SetNextWindowSize(size,ImGuiCond_Always);
@@ -237,6 +237,36 @@ class UI
             }
             if(selected)
             {
+                ImGui::Separator();
+                ImGui::Text("type: %s", GetObjTypeLabel(selected->type));
+
+                if(selected->type != ObjType::Light)
+                {
+                    const char* currentModeLabel = GetRenderModeLabel(selected->material.renderMode);
+                    if(ImGui::BeginCombo("render mode", currentModeLabel))
+                    {
+                        const RenderMode renderModes[] = {RenderMode::Phong, RenderMode::PBR, RenderMode::NPR};
+                        for(RenderMode mode : renderModes)
+                        {
+                            const bool isSelectedMode = selected->material.renderMode == mode;
+                            if(ImGui::Selectable(GetRenderModeLabel(mode), isSelectedMode))
+                                selected->material.renderMode = mode;
+                            if(isSelectedMode)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+
+                    ImGui::ColorEdit3("albedo", glm::value_ptr(selected->material.albedo));
+                    ImGui::SliderFloat("metallic", &selected->material.metallic, 0.0f, 1.0f);
+                    ImGui::SliderFloat("roughness", &selected->material.roughness, 0.05f, 1.0f);
+                    ImGui::SliderFloat("ao", &selected->material.ao, 0.0f, 1.0f);
+                    ImGui::SliderFloat("toon levels", &selected->material.toonLevels, 2.0f, 6.0f, "%.0f");
+                    ImGui::SliderFloat("outline width", &selected->material.outlineWidth, 0.0f, 0.2f, "%.3f");
+                    ImGui::SliderFloat("shininess", &selected->material.shininess, 1.0f, 128.0f);
+                }
+
+                ImGui::Separator();
                 float t[3],r[3],s[3];
                 ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(selected->model), t, r, s);
                 ImGui::InputFloat3("tr",t);
