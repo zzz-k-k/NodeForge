@@ -155,10 +155,10 @@ class Model
                 {
                     aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
                     vector<Texture> diffuseMaps = loadMaterialTextures(material, 
-                                                        aiTextureType_DIFFUSE, "texture_diffuse");
+                                                        aiTextureType_DIFFUSE, "texture_diffuse", true);
                     textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
                     vector<Texture> specularMaps = loadMaterialTextures(material, 
-                                                        aiTextureType_SPECULAR, "texture_specular");
+                                                        aiTextureType_SPECULAR, "texture_specular", false);
                     textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
                 }
                 else
@@ -169,7 +169,7 @@ class Model
             }
             return Mesh(vertices,indices,textures);
         }
-        vector<Texture> loadMaterialTextures(aiMaterial *mat,aiTextureType type,string typeName)
+        vector<Texture> loadMaterialTextures(aiMaterial *mat,aiTextureType type,string typeName,bool gamma = false)
         {
             vector<Texture> textures;
             for(unsigned int i = 0; i < mat->GetTextureCount(type); i++)
@@ -188,12 +188,8 @@ class Model
                 }
                 if(!skip)
                 {   // 如果纹理还没有被加载，则加载它
-                    Texture texture;
-                    texture.id = TextureFromFile(str.C_Str(), directory);
-                    texture.type = typeName;
-                    texture.path = str.C_Str();
-                    textures.push_back(texture);
-                    textures_loaded.push_back(texture); // 添加到已加载的纹理中
+                    textures.push_back({TextureFromFile(str.C_Str(), directory, gamma), typeName, str.C_Str()});
+                    textures_loaded.push_back(textures.back()); // 添加到已加载的纹理中
                 }
             }
             return textures;
@@ -215,15 +211,30 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
     if (data)
     {
         GLenum format;
+        GLenum internalFormat;
         if (nrComponents == 1)
+        {
             format = GL_RED;
+            internalFormat = GL_RED;
+        }
         else if (nrComponents == 3)
+        {
             format = GL_RGB;
+            internalFormat = gamma ? GL_SRGB : GL_RGB;
+        }
         else if (nrComponents == 4)
+        {
             format = GL_RGBA;
+            internalFormat = gamma ? GL_SRGB_ALPHA : GL_RGBA;
+        }
+        else
+        {
+            format = GL_RGB;
+            internalFormat = gamma ? GL_SRGB : GL_RGB;
+        }
 
         glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);

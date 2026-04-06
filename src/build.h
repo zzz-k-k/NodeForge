@@ -361,7 +361,7 @@ public:
         obj.material.diffuseTexPath = "container2.png";
         obj.material.specularTexPath = "container2_specular.png";
         obj.material.normalTexPath = "";
-        obj.material.albedo = glm::vec3(1.0f, 0.766f, 0.336f);
+        obj.material.albedo = glm::vec3(1.0f, 1.0f, 1.0f);
         obj.material.metallic = 0.0f;
         obj.material.roughness = 0.35f;
         obj.material.ao = 1.0f;

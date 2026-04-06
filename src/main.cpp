@@ -732,6 +732,7 @@ void BindObjectMaterialTextures(const SceneObject& obj)
     glBindTexture(GL_TEXTURE_2D, id != 0 ? id : TexCache.GetDefaultNormal());
 }
 
+//对不同的shader传入不同的参数
 void ApplySurfaceMaterialUniforms(Shader& shader,const SceneObject& obj,bool enableNormalMap)
 {
     shader.setMat4("transform", obj.model);
@@ -809,6 +810,7 @@ void ApplyCommonSurfaceUniforms(Shader& shader,const glm::mat4& view,const glm::
     shader.setVec3("shadowCasterPos", shadowCasterPos);
 }
 
+//选择不同的shader
 Shader& SelectSurfaceShader(const SceneObject& obj,Shader& phongShader,Shader& pbrShader,Shader& nprShader)
 {
     switch(obj.material.renderMode)
@@ -868,6 +870,7 @@ void drawOpaqueObject(Shader& lampShader,Shader& phongShader,Shader& pbrShader,S
         }
         else if(obj.type==ObjType::Model&&obj.modelAsset)
         {
+            //根据不同选项选择不同的shader
             Shader& surfaceShader = SelectSurfaceShader(obj,phongShader,pbrShader,nprShader);
             surfaceShader.use();
             ApplySurfaceMaterialUniforms(surfaceShader,obj,false);

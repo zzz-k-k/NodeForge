@@ -9,6 +9,7 @@ uniform vec3 viewPos;
 
 #define MAX_POINT_LIGHT 8
 uniform int numPointLights;
+const float PI = 3.14159265359;
 
 struct Material
 {
@@ -48,69 +49,110 @@ struct PointLight
 
 uniform PointLight pointLights[MAX_POINT_LIGHT];
 
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float denominator = (NdotH2 * (a2 - 1.0) + 1.0);
+    denominator = PI * denominator * denominator;
+    return a2 / max(denominator, 0.0001);
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float k = roughness + 1.0;
+    k = (k * k) / 8.0;
+
+    float denominator = NdotV * (1.0 - k) + k;
+    return NdotV / max(denominator, 0.0001);
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    return ggx1 * ggx2;
+}
+
+vec3 FresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 vec3 GetBaseColor()
 {
     vec4 texColor = texture(material.texture_diffuse1, TexCoord);
     return clamp(texColor.rgb * material.albedo, 0.0, 1.0);
 }
 
-vec3 EvaluateLight(vec3 baseColor, vec3 normal, vec3 viewDir, vec3 lightDir, vec3 radiance)
+vec3 EvaluateCookTorrance(vec3 baseColor, vec3 N, vec3 V, vec3 L, vec3 radiance)
 {
-    float roughness = clamp(material.roughness, 0.05, 1.0);
     float metallic = clamp(material.metallic, 0.0, 1.0);
+    float roughness = clamp(material.roughness, 0.05, 1.0);
 
-    vec3 halfDir = normalize(viewDir + lightDir);
-    float NdotL = max(dot(normal, lightDir), 0.0);
-    float NdotV = max(dot(normal, viewDir), 0.0);
-    float NdotH = max(dot(normal, halfDir), 0.0);
-    float VdotH = max(dot(viewDir, halfDir), 0.0);
-
-    float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
-    float denom = max((NdotH * NdotH) * (alpha2 - 1.0) + 1.0, 0.0001);
-    float distribution = alpha2 / (3.14159265 * denom * denom);
-
-    float k = ((roughness + 1.0) * (roughness + 1.0)) / 8.0;
-    float geometryV = NdotV / max(NdotV * (1.0 - k) + k, 0.0001);
-    float geometryL = NdotL / max(NdotL * (1.0 - k) + k, 0.0001);
-    float geometry = geometryV * geometryL;
+    vec3 H = normalize(V + L);
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float HdotV = max(dot(H, V), 0.0);
 
     vec3 F0 = mix(vec3(0.04), baseColor, metallic);
-    vec3 fresnel = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+    vec3 F = FresnelSchlick(HdotV, F0);
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
 
-    vec3 numerator = distribution * geometry * fresnel;
-    float denominator = max(4.0 * NdotV * NdotL, 0.0001);
-    vec3 specular = numerator / denominator;
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * NdotV * NdotL;
+    vec3 specular = numerator / max(denominator, 0.0001);
 
-    vec3 kS = fresnel;
+    vec3 kS = F;
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
-    vec3 diffuse = kD * baseColor / 3.14159265;
+    vec3 diffuse = kD * baseColor / PI;
 
     return (diffuse + specular) * radiance * NdotL;
+}
+
+vec3 EvaluateDirectionalLight(vec3 baseColor, vec3 N, vec3 V)
+{
+    vec3 L = normalize(-dirLight.direction);
+    vec3 radiance = max(dirLight.diffuse, dirLight.specular);
+    return EvaluateCookTorrance(baseColor, N, V, L, radiance);
+}
+
+vec3 EvaluatePointLight(PointLight light, vec3 baseColor, vec3 N, vec3 V)
+{
+    vec3 lightVector = light.position - FragPos;
+    float distance = length(lightVector);
+    vec3 L = normalize(lightVector);
+    float attenuation = 1.0 / (light.constant + light.linear * distance +
+                               light.quadratic * distance * distance);
+    vec3 radiance = max(light.diffuse, light.specular) * attenuation;
+    return EvaluateCookTorrance(baseColor, N, V, L, radiance);
+}
+
+vec3 GetAmbientTerm(vec3 baseColor)
+{
+    vec3 sceneAmbient = max(dirLight.ambient, vec3(0.03));
+    return sceneAmbient * baseColor * clamp(material.ao, 0.0, 1.0);
 }
 
 void main()
 {
     vec4 texColor = texture(material.texture_diffuse1, TexCoord);
     vec3 baseColor = GetBaseColor();
-    vec3 normal = normalize(Normal);
-    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 N = normalize(Normal);
+    vec3 V = normalize(viewPos - FragPos);
 
-    vec3 color = dirLight.ambient * baseColor * material.ao;
+    vec3 color = GetAmbientTerm(baseColor);
+    color += EvaluateDirectionalLight(baseColor, N, V);
 
-    vec3 dirLightDir = normalize(-dirLight.direction);
-    vec3 dirRadiance = dirLight.diffuse + dirLight.specular;
-    color += EvaluateLight(baseColor, normal, viewDir, dirLightDir, dirRadiance);
-
-    for(int i = 0; i < numPointLights; ++i)
+    for(int i = 0; i < numPointLights; i++)
     {
-        vec3 lightVector = pointLights[i].position - FragPos;
-        float distance = length(lightVector);
-        vec3 lightDir = normalize(lightVector);
-        float attenuation = 1.0 / (pointLights[i].constant + pointLights[i].linear * distance +
-                                   pointLights[i].quadratic * distance * distance);
-        vec3 radiance = (pointLights[i].diffuse + pointLights[i].specular) * attenuation;
-        color += EvaluateLight(baseColor, normal, viewDir, lightDir, radiance);
+        color += EvaluatePointLight(pointLights[i], baseColor, N, V);
     }
 
     color = color / (color + vec3(1.0));
