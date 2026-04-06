@@ -28,6 +28,7 @@ void ApplySurfaceMaterialUniforms(Shader& shader,const SceneObject& obj,bool ena
 void ApplyCommonSurfaceUniforms(Shader& shader,const glm::mat4& view,const glm::mat4& projection,const glm::mat4& lightSpaceMatrix,const glm::vec3& shadowCasterPos);
 Shader& SelectSurfaceShader(const SceneObject& obj,Shader& phongShader,Shader& pbrShader,Shader& nprShader);
 void DrawSceneObjectGeometry(Shader& shader,SceneObject& obj);
+bool ShouldDrawOutline(const SceneObject& obj);
 void drawOpaqueObject(Shader& lampShader,Shader& phongShader,Shader& pbrShader,Shader& nprShader,const glm::mat4& view,const glm::mat4& projection);
 void drawDepthObjects(Shader& depthShader);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -562,7 +563,7 @@ int main()
         for(auto* obj:transparentObjects)
         {
             glStencilMask(0x00);
-            if(obj->selected)
+            if(ShouldDrawOutline(*obj))
             {
                 glStencilFunc(GL_ALWAYS,1,0xFF);
                 glStencilMask(0xFF);
@@ -576,7 +577,7 @@ int main()
         glDepthMask(GL_TRUE);
         glEnable(GL_CULL_FACE);
 
-        // 绘制所有选中物体的轮廓
+        // 绘制需要轮廓的物体
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
         glStencilMask(0x00);
         glDepthMask(GL_FALSE); // 禁止写入深度，但仍进行深度测试
@@ -585,7 +586,7 @@ int main()
 
         for (auto& obj : build.objects)
         {
-            if (obj.selected)
+            if (ShouldDrawOutline(obj))
             {
                 lampShader.use();
                 lampShader.setMat4("view",view);
@@ -595,6 +596,10 @@ int main()
                 glm::mat4 outlineModel=obj.model;
                 outlineModel=glm::scale(outlineModel,glm::vec3(outlineScale));
                 lampShader.setMat4("model",outlineModel);
+                const glm::vec3 outlineColor = obj.material.renderMode == RenderMode::NPR
+                    ? obj.material.outlineColor
+                    : glm::vec3(1.0f, 1.0f, 1.0f);
+                lampShader.setVec3("color", outlineColor);
                 
                 if(obj.type==ObjType::Model&&obj.modelAsset)
                 {
@@ -737,10 +742,13 @@ void ApplySurfaceMaterialUniforms(Shader& shader,const SceneObject& obj,bool ena
 {
     shader.setMat4("transform", obj.model);
     shader.setVec3("material.albedo", obj.material.albedo);
+    shader.setVec3("material.outlineColor", obj.material.outlineColor);
     shader.setFloat("material.metallic", obj.material.metallic);
     shader.setFloat("material.roughness", obj.material.roughness);
     shader.setFloat("material.ao", obj.material.ao);
     shader.setFloat("material.toonLevels", obj.material.toonLevels);
+    shader.setFloat("material.shadowThreshold", obj.material.shadowThreshold);
+    shader.setFloat("material.specularThreshold", obj.material.specularThreshold);
     shader.setFloat("material.outlineWidth", obj.material.outlineWidth);
     shader.setFloat("material.shininess", obj.material.shininess);
     shader.setInt("material.texture_diffuse1", 0);
@@ -843,6 +851,17 @@ void DrawSceneObjectGeometry(Shader& shader,SceneObject& obj)
     }
 }
 
+bool ShouldDrawOutline(const SceneObject& obj)
+{
+    if(obj.material.outlineWidth <= 0.0f)
+        return false;
+
+    if(obj.type == ObjType::Light)
+        return obj.selected;
+
+    return obj.selected || obj.material.renderMode == RenderMode::NPR;
+}
+
 void drawOpaqueObject(Shader& lampShader,Shader& phongShader,Shader& pbrShader,Shader& nprShader,const glm::mat4& view,const glm::mat4& projection)
 {
     for (auto& obj : build.objects)
@@ -866,10 +885,16 @@ void drawOpaqueObject(Shader& lampShader,Shader& phongShader,Shader& pbrShader,S
             lampShader.setMat4("view", view);
             lampShader.setMat4("projection", projection);
             lampShader.setMat4("model",obj.model);
+            lampShader.setVec3("color", 1.0f, 1.0f, 1.0f);
             build.cube.Draw();
         }
         else if(obj.type==ObjType::Model&&obj.modelAsset)
         {
+            if(ShouldDrawOutline(obj))
+            {
+                glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                glStencilMask(0xFF);
+            }
             //根据不同选项选择不同的shader
             Shader& surfaceShader = SelectSurfaceShader(obj,phongShader,pbrShader,nprShader);
             surfaceShader.use();
@@ -879,6 +904,11 @@ void drawOpaqueObject(Shader& lampShader,Shader& phongShader,Shader& pbrShader,S
         
         else //cube
         {
+            if(ShouldDrawOutline(obj))
+            {
+                glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                glStencilMask(0xFF);
+            }
             Shader& surfaceShader = SelectSurfaceShader(obj,phongShader,pbrShader,nprShader);
             surfaceShader.use();
             const bool enableNormalMap = obj.material.renderMode == RenderMode::Phong && !obj.material.normalTexPath.empty();

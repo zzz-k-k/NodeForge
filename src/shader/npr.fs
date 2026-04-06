@@ -15,10 +15,13 @@ struct Material
     sampler2D texture_diffuse1;
     sampler2D texture_specular1;
     vec3 albedo;
+    vec3 outlineColor;
     float metallic;
     float roughness;
     float ao;
     float toonLevels;
+    float shadowThreshold;
+    float specularThreshold;
     float outlineWidth;
     float shininess;
 };
@@ -57,20 +60,31 @@ vec3 GetBaseColor()
 float QuantizeDiffuse(float value, float levels)
 {
     float safeLevels = max(levels, 2.0);
-    return floor(value * safeLevels) / (safeLevels - 1.0);
+    return floor(value * (safeLevels - 1.0) + 0.5) / (safeLevels - 1.0);
+}
+
+float EvaluateToonBand(float diffuse)
+{
+    float threshold = clamp(material.shadowThreshold, 0.0, 0.95);
+    if(diffuse <= threshold)
+        return 0.18;
+
+    float remapped = clamp((diffuse - threshold) / max(1.0 - threshold, 0.0001), 0.0, 1.0);
+    float steppedDiffuse = QuantizeDiffuse(remapped, material.toonLevels);
+    return mix(0.25, 1.0, steppedDiffuse);
 }
 
 vec3 EvaluateToonLight(vec3 baseColor, vec3 normal, vec3 viewDir, vec3 lightDir, vec3 radiance)
 {
     float diffuse = max(dot(normal, lightDir), 0.0);
-    float steppedDiffuse = clamp(QuantizeDiffuse(diffuse, material.toonLevels), 0.0, 1.0);
+    float toonBand = EvaluateToonBand(diffuse);
 
     vec3 halfDir = normalize(viewDir + lightDir);
-    float specular = pow(max(dot(normal, halfDir), 0.0), 64.0);
-    float steppedSpecular = specular > 0.45 ? 1.0 : 0.0;
+    float specular = pow(max(dot(normal, halfDir), 0.0), 96.0);
+    float steppedSpecular = specular >= clamp(material.specularThreshold, 0.0, 0.99) ? 1.0 : 0.0;
 
-    vec3 diffuseColor = baseColor * steppedDiffuse * radiance;
-    vec3 specularColor = steppedSpecular * 0.2 * radiance;
+    vec3 diffuseColor = baseColor * toonBand * radiance;
+    vec3 specularColor = steppedSpecular * 0.22 * radiance;
     return diffuseColor + specularColor;
 }
 
@@ -81,7 +95,7 @@ void main()
     vec3 normal = normalize(Normal);
     vec3 viewDir = normalize(viewPos - FragPos);
 
-    vec3 color = dirLight.ambient * baseColor * material.ao;
+    vec3 color = max(dirLight.ambient * baseColor * material.ao, baseColor * 0.03);
 
     vec3 dirLightDir = normalize(-dirLight.direction);
     color += EvaluateToonLight(baseColor, normal, viewDir, dirLightDir, dirLight.diffuse);
@@ -97,5 +111,6 @@ void main()
         color += EvaluateToonLight(baseColor, normal, viewDir, lightDir, radiance);
     }
 
+    color = clamp(color, 0.0, 1.0);
     FragColor = vec4(color, texColor.a);
 }

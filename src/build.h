@@ -46,10 +46,13 @@ struct Material
     std::string specularTexPath;
     std::string normalTexPath;
     glm::vec3 albedo=glm::vec3(1.0f,1.0f,1.0f);
+    glm::vec3 outlineColor=glm::vec3(0.0f,0.0f,0.0f);
     float metallic=0.0f;
     float roughness=0.5f;
     float ao=1.0f;
     float toonLevels=4.0f;
+    float shadowThreshold=0.45f;
+    float specularThreshold=0.6f;
     float outlineWidth=0.05f;
     float shininess=32.0f;
 };
@@ -328,6 +331,9 @@ public:
         obj.material.roughness=0.5f;
         obj.material.ao=1.0f;
         obj.material.toonLevels=4.0f;
+        obj.material.shadowThreshold=0.45f;
+        obj.material.specularThreshold=0.6f;
+        obj.material.outlineColor=glm::vec3(0.0f,0.0f,0.0f);
         obj.material.outlineWidth=0.05f;
         objects.push_back(obj);
     }
@@ -347,6 +353,9 @@ public:
         obj.material.roughness=0.9f;
         obj.material.ao=1.0f;
         obj.material.toonLevels=4.0f;
+        obj.material.shadowThreshold=0.45f;
+        obj.material.specularThreshold=0.55f;
+        obj.material.outlineColor=glm::vec3(0.0f,0.0f,0.0f);
         obj.material.outlineWidth=0.05f;
         objects.push_back(obj);
     }
@@ -366,6 +375,9 @@ public:
         obj.material.roughness = 0.35f;
         obj.material.ao = 1.0f;
         obj.material.toonLevels = 4.0f;
+        obj.material.shadowThreshold = 0.45f;
+        obj.material.specularThreshold = 0.6f;
+        obj.material.outlineColor = glm::vec3(0.0f, 0.0f, 0.0f);
         obj.material.outlineWidth = 0.05f;
         obj.material.shininess = 32.0f;
         objects.push_back(obj);
