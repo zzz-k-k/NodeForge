@@ -258,12 +258,16 @@ class UI
                     }
 
                     ImGui::ColorEdit3("albedo", glm::value_ptr(selected->material.albedo));
+                    ImGui::ColorEdit3("shadow color", glm::value_ptr(selected->material.shadowColor));
                     ImGui::SliderFloat("metallic", &selected->material.metallic, 0.0f, 1.0f);
                     ImGui::SliderFloat("roughness", &selected->material.roughness, 0.05f, 1.0f);
                     ImGui::SliderFloat("ao", &selected->material.ao, 0.0f, 1.0f);
                     ImGui::SliderFloat("toon levels", &selected->material.toonLevels, 2.0f, 6.0f, "%.0f");
                     ImGui::SliderFloat("shadow threshold", &selected->material.shadowThreshold, 0.0f, 0.95f, "%.2f");
                     ImGui::SliderFloat("spec threshold", &selected->material.specularThreshold, 0.0f, 0.99f, "%.2f");
+                    ImGui::ColorEdit3("rim light color", glm::value_ptr(selected->material.rimLightColor));
+                    ImGui::SliderFloat("rim intensity", &selected->material.rimLightIntensity, 0.0f, 1.5f, "%.2f");
+                    ImGui::SliderFloat("rim width", &selected->material.rimLightWidth, 0.02f, 1.0f, "%.2f");
                     ImGui::ColorEdit3("outline color", glm::value_ptr(selected->material.outlineColor));
                     ImGui::SliderFloat("outline width", &selected->material.outlineWidth, 0.0f, 0.2f, "%.3f");
                     ImGui::SliderFloat("shininess", &selected->material.shininess, 1.0f, 128.0f);

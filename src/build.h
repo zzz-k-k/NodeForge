@@ -46,13 +46,17 @@ struct Material
     std::string specularTexPath;
     std::string normalTexPath;
     glm::vec3 albedo=glm::vec3(1.0f,1.0f,1.0f);
+    glm::vec3 shadowColor=glm::vec3(0.55f,0.62f,0.78f);
     glm::vec3 outlineColor=glm::vec3(0.0f,0.0f,0.0f);
+    glm::vec3 rimLightColor=glm::vec3(1.0f,1.0f,1.0f);
     float metallic=0.0f;
     float roughness=0.5f;
     float ao=1.0f;
     float toonLevels=4.0f;
     float shadowThreshold=0.45f;
     float specularThreshold=0.6f;
+    float rimLightIntensity=0.0f;
+    float rimLightWidth=0.35f;
     float outlineWidth=0.05f;
     float shininess=32.0f;
 };
@@ -327,6 +331,7 @@ public:
         obj.modelAsset=std::make_shared<Model>(path.c_str());
         obj.material.renderMode=RenderMode::Phong;
         obj.material.albedo=glm::vec3(1.0f,1.0f,1.0f);
+        obj.material.shadowColor=glm::vec3(0.55f,0.62f,0.78f);
         obj.material.metallic=0.0f;
         obj.material.roughness=0.5f;
         obj.material.ao=1.0f;
@@ -334,6 +339,9 @@ public:
         obj.material.shadowThreshold=0.45f;
         obj.material.specularThreshold=0.6f;
         obj.material.outlineColor=glm::vec3(0.0f,0.0f,0.0f);
+        obj.material.rimLightColor=glm::vec3(1.0f,1.0f,1.0f);
+        obj.material.rimLightIntensity=0.25f;
+        obj.material.rimLightWidth=0.35f;
         obj.material.outlineWidth=0.05f;
         objects.push_back(obj);
     }
@@ -349,6 +357,7 @@ public:
         obj.material.specularTexPath = "./normalmap/brickwall.jpg";
         obj.material.normalTexPath = "normalmap/brickwall_normal.jpg";
         obj.material.albedo=glm::vec3(1.0f,1.0f,1.0f);
+        obj.material.shadowColor=glm::vec3(0.55f,0.62f,0.78f);
         obj.material.metallic=0.0f;
         obj.material.roughness=0.9f;
         obj.material.ao=1.0f;
@@ -356,6 +365,9 @@ public:
         obj.material.shadowThreshold=0.45f;
         obj.material.specularThreshold=0.55f;
         obj.material.outlineColor=glm::vec3(0.0f,0.0f,0.0f);
+        obj.material.rimLightColor=glm::vec3(1.0f,1.0f,1.0f);
+        obj.material.rimLightIntensity=0.2f;
+        obj.material.rimLightWidth=0.3f;
         obj.material.outlineWidth=0.05f;
         objects.push_back(obj);
     }
@@ -371,6 +383,7 @@ public:
         obj.material.specularTexPath = "container2_specular.png";
         obj.material.normalTexPath = "";
         obj.material.albedo = glm::vec3(1.0f, 1.0f, 1.0f);
+        obj.material.shadowColor = glm::vec3(0.55f, 0.62f, 0.78f);
         obj.material.metallic = 0.0f;
         obj.material.roughness = 0.35f;
         obj.material.ao = 1.0f;
@@ -378,6 +391,9 @@ public:
         obj.material.shadowThreshold = 0.45f;
         obj.material.specularThreshold = 0.6f;
         obj.material.outlineColor = glm::vec3(0.0f, 0.0f, 0.0f);
+        obj.material.rimLightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+        obj.material.rimLightIntensity = 0.3f;
+        obj.material.rimLightWidth = 0.35f;
         obj.material.outlineWidth = 0.05f;
         obj.material.shininess = 32.0f;
         objects.push_back(obj);
