@@ -745,10 +745,16 @@ void ApplySurfaceMaterialUniforms(Shader& shader,const SceneObject& obj,bool ena
     shader.setVec3("material.shadowColor", obj.material.shadowColor);
     shader.setVec3("material.outlineColor", obj.material.outlineColor);
     shader.setVec3("material.rimLightColor", obj.material.rimLightColor);
+    shader.setVec3("material.indirectLightMinColor", obj.material.indirectLightMinColor);
+    shader.setBool("material.isFace", obj.material.isFace);
     shader.setFloat("material.metallic", obj.material.metallic);
     shader.setFloat("material.roughness", obj.material.roughness);
     shader.setFloat("material.ao", obj.material.ao);
     shader.setFloat("material.toonLevels", obj.material.toonLevels);
+    shader.setFloat("material.celShadeMidPoint", obj.material.celShadeMidPoint);
+    shader.setFloat("material.celShadeSoftness", obj.material.celShadeSoftness);
+    shader.setFloat("material.directLightMultiplier", obj.material.directLightMultiplier);
+    shader.setFloat("material.additionalLightMultiplier", obj.material.additionalLightMultiplier);
     shader.setFloat("material.shadowThreshold", obj.material.shadowThreshold);
     shader.setFloat("material.specularThreshold", obj.material.specularThreshold);
     shader.setFloat("material.rimLightIntensity", obj.material.rimLightIntensity);

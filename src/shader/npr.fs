@@ -19,10 +19,16 @@ struct Material
     vec3 shadowColor;
     vec3 outlineColor;
     vec3 rimLightColor;
+    vec3 indirectLightMinColor;
+    bool isFace;
     float metallic;
     float roughness;
     float ao;
     float toonLevels;
+    float celShadeMidPoint;
+    float celShadeSoftness;
+    float directLightMultiplier;
+    float additionalLightMultiplier;
     float shadowThreshold;
     float specularThreshold;
     float rimLightIntensity;
@@ -68,15 +74,19 @@ float QuantizeDiffuse(float value, float levels)
     return floor(value * (safeLevels - 1.0) + 0.5) / (safeLevels - 1.0);
 }
 
-float EvaluateToonBand(float diffuse)
+float EvaluateCelShade(float noL)
 {
-    float threshold = clamp(material.shadowThreshold, 0.0, 0.95);
-    if(diffuse <= threshold)
-        return 0.0;
+    float midpoint = clamp(material.celShadeMidPoint, -1.0, 1.0);
+    float softness = max(material.celShadeSoftness, 0.001);
+    float litArea = smoothstep(midpoint - softness, midpoint + softness, noL);
+    litArea = QuantizeDiffuse(litArea, material.toonLevels);
 
-    float remapped = clamp((diffuse - threshold) / max(1.0 - threshold, 0.0001), 0.0, 1.0);
-    float steppedDiffuse = QuantizeDiffuse(remapped, material.toonLevels);
-    return mix(0.35, 1.0, steppedDiffuse);
+    if(material.isFace)
+    {
+        litArea = mix(0.5, 1.0, litArea);
+    }
+
+    return litArea;
 }
 
 vec3 EvaluateRimLight(vec3 normal, vec3 viewDir)
@@ -87,11 +97,13 @@ vec3 EvaluateRimLight(vec3 normal, vec3 viewDir)
     return material.rimLightColor * rimMask * material.rimLightIntensity;
 }
 
-vec3 EvaluateToonLight(vec3 baseColor, vec3 normal, vec3 viewDir, vec3 lightDir, vec3 radiance)
+vec3 EvaluateToonLight(vec3 baseColor, vec3 normal, vec3 viewDir, vec3 lightDir, vec3 radiance, bool isAdditionalLight)
 {
-    float diffuse = max(dot(normal, lightDir), 0.0);
-    float toonBand = EvaluateToonBand(diffuse);
-    vec3 shadedBase = mix(baseColor * material.shadowColor, baseColor, toonBand);
+    float noL = dot(normal, lightDir);
+    float litArea = EvaluateCelShade(noL) * clamp(material.ao, 0.0, 1.0);
+    vec3 litOrShadowColor = mix(material.shadowColor, vec3(1.0), litArea);
+    float lightMultiplier = isAdditionalLight ? material.additionalLightMultiplier : material.directLightMultiplier;
+    vec3 lightColor = radiance * litOrShadowColor * lightMultiplier;
 
     vec3 halfDir = normalize(viewDir + lightDir);
     float specular = max(dot(normal, halfDir), 0.0);
@@ -102,8 +114,8 @@ vec3 EvaluateToonLight(vec3 baseColor, vec3 normal, vec3 viewDir, vec3 lightDir,
     );
     steppedSpecular = steppedSpecular > 0.5 ? 1.0 : 0.0;
 
-    vec3 diffuseColor = shadedBase * radiance;
-    vec3 specularColor = steppedSpecular * 0.28 * radiance;
+    vec3 diffuseColor = baseColor * lightColor;
+    vec3 specularColor = steppedSpecular * 0.28 * radiance * lightMultiplier;
     return diffuseColor + specularColor;
 }
 
@@ -114,11 +126,11 @@ void main()
     vec3 normal = normalize(Normal);
     vec3 viewDir = normalize(viewPos - FragPos);
 
-    vec3 ambientBase = baseColor * material.shadowColor;
-    vec3 color = max(dirLight.ambient * ambientBase * material.ao, ambientBase * 0.08);
+    vec3 indirectLight = max(dirLight.ambient, material.indirectLightMinColor);
+    vec3 color = baseColor * indirectLight * clamp(material.ao, 0.0, 1.0);
 
     vec3 dirLightDir = normalize(-dirLight.direction);
-    color += EvaluateToonLight(baseColor, normal, viewDir, dirLightDir, dirLight.diffuse);
+    color += EvaluateToonLight(baseColor, normal, viewDir, dirLightDir, dirLight.diffuse, false);
 
     for(int i = 0; i < numPointLights; ++i)
     {
@@ -128,7 +140,7 @@ void main()
         float attenuation = 1.0 / (pointLights[i].constant + pointLights[i].linear * distance +
                                    pointLights[i].quadratic * distance * distance);
         vec3 radiance = pointLights[i].diffuse * attenuation;
-        color += EvaluateToonLight(baseColor, normal, viewDir, lightDir, radiance);
+        color += EvaluateToonLight(baseColor, normal, viewDir, lightDir, radiance, true);
     }
 
     color += EvaluateRimLight(normal, viewDir);

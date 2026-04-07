@@ -250,7 +250,11 @@ class UI
                         {
                             const bool isSelectedMode = selected->material.renderMode == mode;
                             if(ImGui::Selectable(GetRenderModeLabel(mode), isSelectedMode))
+                            {
                                 selected->material.renderMode = mode;
+                                if(mode == RenderMode::NPR)
+                                    ApplyAnimeNprPreset(selected->material);
+                            }
                             if(isSelectedMode)
                                 ImGui::SetItemDefaultFocus();
                         }
@@ -259,11 +263,16 @@ class UI
 
                     ImGui::ColorEdit3("albedo", glm::value_ptr(selected->material.albedo));
                     ImGui::ColorEdit3("shadow color", glm::value_ptr(selected->material.shadowColor));
+                    ImGui::ColorEdit3("indirect min", glm::value_ptr(selected->material.indirectLightMinColor));
                     ImGui::SliderFloat("metallic", &selected->material.metallic, 0.0f, 1.0f);
                     ImGui::SliderFloat("roughness", &selected->material.roughness, 0.05f, 1.0f);
                     ImGui::SliderFloat("ao", &selected->material.ao, 0.0f, 1.0f);
+                    ImGui::Checkbox("is face", &selected->material.isFace);
+                    ImGui::SliderFloat("cel midpoint", &selected->material.celShadeMidPoint, -1.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("cel softness", &selected->material.celShadeSoftness, 0.001f, 0.5f, "%.3f");
+                    ImGui::SliderFloat("direct light", &selected->material.directLightMultiplier, 0.0f, 2.0f, "%.2f");
+                    ImGui::SliderFloat("additional light", &selected->material.additionalLightMultiplier, 0.0f, 1.0f, "%.2f");
                     ImGui::SliderFloat("toon levels", &selected->material.toonLevels, 2.0f, 6.0f, "%.0f");
-                    ImGui::SliderFloat("shadow threshold", &selected->material.shadowThreshold, 0.0f, 0.95f, "%.2f");
                     ImGui::SliderFloat("spec threshold", &selected->material.specularThreshold, 0.0f, 0.99f, "%.2f");
                     ImGui::ColorEdit3("rim light color", glm::value_ptr(selected->material.rimLightColor));
                     ImGui::SliderFloat("rim intensity", &selected->material.rimLightIntensity, 0.0f, 1.5f, "%.2f");
